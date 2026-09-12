@@ -8,8 +8,9 @@ authentication; do not ship credential files.
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +30,36 @@ class Settings(BaseSettings):
     google_cloud_project: str = "aiwomen26ham-4410"
     google_cloud_location: str = "europe-west3"
     gemini_model: str = ""
+    allowed_origins: str = ""
+
+    @field_validator("allowed_origins")
+    @classmethod
+    def validate_origins(cls, value: str) -> str:
+        origins = []
+        for item in value.split(","):
+            origin = item.strip()
+            if not origin:
+                continue
+            try:
+                parsed = urlsplit(origin)
+                valid = (parsed.scheme in ("http", "https") and parsed.hostname
+                         and not parsed.username and not parsed.password
+                         and parsed.path in ("", "/") and not parsed.query and not parsed.fragment
+                         and not any(c.isspace() for c in origin) and "*" not in origin)
+                _ = parsed.port
+            except ValueError:
+                valid = False
+            if not valid:
+                raise ValueError("ALLOWED_ORIGINS must contain explicit HTTP(S) origins without credentials, paths or wildcards.")
+            origins.append(origin.rstrip("/"))
+        return ",".join(dict.fromkeys(origins))
+
+    @property
+    def cors_origins(self) -> list[str]:
+        origins = [origin for origin in self.allowed_origins.split(",") if origin]
+        if self.app_env == "development":
+            origins.extend(("http://localhost:3000", "http://localhost:5173"))
+        return list(dict.fromkeys(origins))
 
 
 @lru_cache

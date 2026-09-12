@@ -3,6 +3,8 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
+from app.config import get_settings
+from app.cors import configure_cors
 from app.models.analysis import AnalysisResponse
 from app.models.assessment import PropertyAssessment
 from app.models.property_fact import AnonymizedDocument
@@ -14,6 +16,7 @@ from app.services.pdf_uploads import UploadValidationError, read_pdf_documents
 from app.services.property_analysis import PropertyAnalysisError, PropertyAnalysisService, get_property_analysis_service
 
 app = FastAPI(title="Property Due Diligence Assistant", version="0.1.0")
+configure_cors(app, get_settings())
 
 
 @app.get("/health")
