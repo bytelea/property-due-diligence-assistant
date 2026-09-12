@@ -1,6 +1,7 @@
 from uuid import uuid4
+from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from app.config import get_settings
@@ -80,7 +81,11 @@ async def analyze(
 @app.post("/properties/analyze", response_model=PropertyAssessment)
 async def analyze_property(
     request: Request,
-    files: list[UploadFile],
+    files: Annotated[
+        list[UploadFile],
+        # FastAPI 0.141 emits contentMediaType alone; Swagger needs format=binary.
+        File(..., json_schema_extra={"items": {"type": "string", "format": "binary"}}),
+    ],
     service: PropertyAnalysisService = Depends(get_property_analysis_service),
 ) -> PropertyAssessment:
     try:

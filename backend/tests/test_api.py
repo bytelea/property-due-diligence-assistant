@@ -35,3 +35,20 @@ class ApiSmokeTests(unittest.TestCase):
         self.assertEqual(impact["amount"], 6500)
         self.assertEqual(impact["currency"], "EUR")
         self.assertEqual(impact["status"], "known")
+
+    def test_property_upload_openapi_uses_binary_file_items(self):
+        with TestClient(app) as client:
+            response = client.get("/openapi.json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+        body = schema["paths"]["/properties/analyze"]["post"]["requestBody"]
+        self.assertTrue(body["required"])
+        self.assertEqual(set(body["content"]), {"multipart/form-data"})
+        reference = body["content"]["multipart/form-data"]["schema"]["$ref"]
+        upload = schema["components"]["schemas"][reference.rsplit("/", 1)[-1]]
+        self.assertEqual(set(upload["properties"]), {"files"})
+        self.assertIn("files", upload["required"])
+        field = upload["properties"]["files"]
+        self.assertEqual(field["type"], "array")
+        self.assertEqual(field["items"]["type"], "string")
+        self.assertEqual(field["items"]["format"], "binary")
