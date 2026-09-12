@@ -1,0 +1,264 @@
+{
+  "id": "assessment-072351b9a8335e74d42bca42",
+  "is_demo": false,
+  "findings": [
+    {
+      "id": "c374e4a4-3fa8-530d-b8c7-c009e9c9add7",
+      "severity": "NEEDS_VERIFICATION",
+      "type": "documented_fact",
+      "category": "financial",
+      "title": "Documented upcoming unit contribution",
+      "summary": "The supplied evidence records a one-time EUR 6,500.00 contribution for unit synthetic-unit, project synthetic-roof. The documented contribution is separate from any WEG/project total. Buyer/seller payment responsibility is not inferred.",
+      "evidence": [
+        {
+          "source": "CONDOMINIUM_ASSOCIATION_MINUTES: minutes",
+          "excerpt": "Upcoming roof works: contribution for this unit is €6,500.",
+          "page": 1,
+          "fact_id": "works",
+          "document_id": "minutes",
+          "document_type": "CONDOMINIUM_ASSOCIATION_MINUTES",
+          "relation": "supports",
+          "source_authority": "documented_resolution",
+          "extraction_confidence": 0.95,
+          "evidence_text": "Upcoming roof works: contribution for this unit is €6,500."
+        }
+      ],
+      "buyer_action": "Ask who is responsible for payment—the current owner or the purchaser—and request the unit assessment and payment schedule.",
+      "confidence": 0.95,
+      "confidence_label": "Low",
+      "confidence_reason": "Deterministic matching of explicit normalized metadata; extraction uncertainty is retained separately in every evidence link.",
+      "status": "open",
+      "linked_facts": [
+        "works"
+      ],
+      "rule_id": "B01+B02",
+      "rulebook_version": "Rulebook.xlsx:sha256:e80b37fb043719129ba0fea709d3c800bc84bad548fea1a3b8809cda06e94abd",
+      "model_version": "none:deterministic",
+      "scope": "unit",
+      "entity_id": "synthetic-unit",
+      "project_id": "synthetic-roof",
+      "uncertainty_reason": "A documented unit contribution does not by itself establish purchaser liability; verify payment responsibility and current status.",
+      "assumptions": [],
+      "financial_impact": {
+        "finding_id": "c374e4a4-3fa8-530d-b8c7-c009e9c9add7",
+        "amount": 6500.0,
+        "currency": "EUR",
+        "status": "known",
+        "description": "Directly evidenced unit contribution, not an allocated project estimate or assumed buyer debt.",
+        "amount_type": "contribution",
+        "scope": "unit",
+        "entity_id": "synthetic-unit",
+        "project_id": "synthetic-roof",
+        "frequency": "one-time",
+        "payer_status": "unknown",
+        "factual_date": "2026-10-01",
+        "factual_period": null
+      },
+      "finding_id": "c374e4a4-3fa8-530d-b8c7-c009e9c9add7",
+      "finding_type": "documented_fact",
+      "facts_used": [
+        "works"
+      ],
+      "explanation": "The supplied evidence records a one-time EUR 6,500.00 contribution for unit synthetic-unit, project synthetic-roof. The documented contribution is separate from any WEG/project total. Buyer/seller payment responsibility is not inferred.",
+      "financial_impact_known": {
+        "finding_id": "c374e4a4-3fa8-530d-b8c7-c009e9c9add7",
+        "amount": 6500.0,
+        "currency": "EUR",
+        "status": "known",
+        "description": "Directly evidenced unit contribution, not an allocated project estimate or assumed buyer debt.",
+        "amount_type": "contribution",
+        "scope": "unit",
+        "entity_id": "synthetic-unit",
+        "project_id": "synthetic-roof",
+        "frequency": "one-time",
+        "payer_status": "unknown",
+        "factual_date": "2026-10-01",
+        "factual_period": null
+      },
+      "financial_impact_possible": null
+    },
+    {
+      "id": "1e00a83f-024c-52d3-b254-f53c934b3070",
+      "severity": "NEEDS_VERIFICATION",
+      "type": "conflict",
+      "category": "floor_area",
+      "title": "Floor area differs across comparable documents",
+      "summary": "EXPOSE (listing) states 105 m²; FLOOR_PLAN (plan) states 92 m². Both refer to living_area, the same entity/scope and factual time/status; the difference is 13 m².",
+      "evidence": [
+        {
+          "source": "EXPOSE: listing",
+          "excerpt": "Floor area: 105 m².",
+          "page": 1,
+          "fact_id": "area-listing",
+          "document_id": "listing",
+          "document_type": "EXPOSE",
+          "relation": "supports",
+          "source_authority": "marketing_claim",
+          "extraction_confidence": 0.95,
+          "evidence_text": "Floor area: 105 m²."
+        },
+        {
+          "source": "FLOOR_PLAN: plan",
+          "excerpt": "Floor area: 92 m².",
+          "page": 1,
+          "fact_id": "area-plan",
+          "document_id": "plan",
+          "document_type": "FLOOR_PLAN",
+          "relation": "supports",
+          "source_authority": "official_plan",
+          "extraction_confidence": 0.95,
+          "evidence_text": "Floor area: 92 m²."
+        }
+      ],
+      "buyer_action": "Ask which floor-area figure is legally recognised and request authoritative supporting documentation and measurements.",
+      "confidence": 0.95,
+      "confidence_label": "Low",
+      "confidence_reason": "Deterministic matching of explicit normalized metadata; extraction uncertainty is retained separately in every evidence link.",
+      "status": "unresolved",
+      "linked_facts": [
+        "area-listing",
+        "area-plan"
+      ],
+      "rule_id": "A19+A30",
+      "rulebook_version": "Rulebook.xlsx:sha256:e80b37fb043719129ba0fea709d3c800bc84bad548fea1a3b8809cda06e94abd",
+      "model_version": "none:deterministic",
+      "scope": "unit",
+      "entity_id": "synthetic-unit",
+      "project_id": null,
+      "uncertainty_reason": "The applicable legally recognised area remains unverified; neither document is silently substituted for the other.",
+      "assumptions": [
+        "Materiality uses caller-supplied tolerances; numerical policy is open in workbook D14."
+      ],
+      "financial_impact": null,
+      "finding_id": "1e00a83f-024c-52d3-b254-f53c934b3070",
+      "finding_type": "conflict",
+      "facts_used": [
+        "area-listing",
+        "area-plan"
+      ],
+      "explanation": "EXPOSE (listing) states 105 m²; FLOOR_PLAN (plan) states 92 m². Both refer to living_area, the same entity/scope and factual time/status; the difference is 13 m².",
+      "financial_impact_known": null,
+      "financial_impact_possible": null
+    },
+    {
+      "id": "8b42e22d-a933-5fb0-b499-f24612abe5e2",
+      "severity": "NEEDS_VERIFICATION",
+      "type": "missing_evidence",
+      "category": "planning",
+      "title": "Applicable planning documentation not supplied",
+      "summary": "An existing alteration/extension and an applicable required-document inventory are linked to the same entity and project. Supporting planning/compliance documentation is not supplied. Status is unknown and needs verification; absence does not establish non-compliance.",
+      "evidence": [
+        {
+          "source": "EXPOSE: listing",
+          "excerpt": "Rear extension exists.",
+          "page": 1,
+          "fact_id": "extension",
+          "document_id": "listing",
+          "document_type": "EXPOSE",
+          "relation": "supports",
+          "source_authority": "marketing_claim",
+          "extraction_confidence": 0.95,
+          "evidence_text": "Rear extension exists."
+        },
+        {
+          "source": "OTHER: pack-inventory",
+          "excerpt": "Planning permission documentation for the rear extension was not supplied.",
+          "page": 1,
+          "fact_id": "planning-missing",
+          "document_id": "pack-inventory",
+          "document_type": "OTHER",
+          "relation": "supports",
+          "source_authority": "document_inventory",
+          "extraction_confidence": 0.95,
+          "evidence_text": "Planning permission documentation for the rear extension was not supplied."
+        }
+      ],
+      "buyer_action": "Request the relevant planning permission and compliance documentation for this alteration or extension and verify applicability with the responsible authority.",
+      "confidence": 0.95,
+      "confidence_label": "Low",
+      "confidence_reason": "Deterministic matching of explicit normalized metadata; extraction uncertainty is retained separately in every evidence link.",
+      "status": "unresolved",
+      "linked_facts": [
+        "extension",
+        "planning-missing"
+      ],
+      "rule_id": "A32+A33",
+      "rulebook_version": "Rulebook.xlsx:sha256:e80b37fb043719129ba0fea709d3c800bc84bad548fea1a3b8809cda06e94abd",
+      "model_version": "none:deterministic",
+      "scope": "unit",
+      "entity_id": "synthetic-unit",
+      "project_id": "synthetic-extension",
+      "uncertainty_reason": "The inventory records documents not supplied, not the absence of permission or legal compliance.",
+      "assumptions": [],
+      "financial_impact": null,
+      "finding_id": "8b42e22d-a933-5fb0-b499-f24612abe5e2",
+      "finding_type": "missing_evidence",
+      "facts_used": [
+        "extension",
+        "planning-missing"
+      ],
+      "explanation": "An existing alteration/extension and an applicable required-document inventory are linked to the same entity and project. Supporting planning/compliance documentation is not supplied. Status is unknown and needs verification; absence does not establish non-compliance.",
+      "financial_impact_known": null,
+      "financial_impact_possible": null
+    }
+  ],
+  "financial_impacts": [
+    {
+      "finding_id": "c374e4a4-3fa8-530d-b8c7-c009e9c9add7",
+      "amount": 6500.0,
+      "currency": "EUR",
+      "status": "known",
+      "description": "Directly evidenced unit contribution, not an allocated project estimate or assumed buyer debt.",
+      "amount_type": "contribution",
+      "scope": "unit",
+      "entity_id": "synthetic-unit",
+      "project_id": "synthetic-roof",
+      "frequency": "one-time",
+      "payer_status": "unknown",
+      "factual_date": "2026-10-01",
+      "factual_period": null
+    }
+  ],
+  "summary": "3 evidence-backed MVP findings; 1 directly documented one-time unit contributions. Unresolved evidence and payer questions require verification.",
+  "known_additional_costs": [
+    {
+      "finding_id": "c374e4a4-3fa8-530d-b8c7-c009e9c9add7",
+      "amount": 6500.0,
+      "currency": "EUR",
+      "status": "known",
+      "description": "Directly evidenced unit contribution, not an allocated project estimate or assumed buyer debt.",
+      "amount_type": "contribution",
+      "scope": "unit",
+      "entity_id": "synthetic-unit",
+      "project_id": "synthetic-roof",
+      "frequency": "one-time",
+      "payer_status": "unknown",
+      "factual_date": "2026-10-01",
+      "factual_period": null
+    }
+  ],
+  "potential_costs": [],
+  "decision_readiness": "NOT_DECISION_READY",
+  "run_metadata": {
+    "model_version": "none:deterministic",
+    "rulebook_version": "Rulebook.xlsx:sha256:e80b37fb043719129ba0fea709d3c800bc84bad548fea1a3b8809cda06e94abd",
+    "engine_version": "locked-mvp-1",
+    "analysis_timestamp": "2026-09-12T00:00:00+00:00",
+    "input_document_ids": [
+      "listing",
+      "minutes",
+      "pack-inventory",
+      "plan"
+    ],
+    "policy": {
+      "area_absolute_tolerance": 2.0,
+      "area_relative_tolerance": 0.02,
+      "as_of": "2026-09-12",
+      "max_document_age_days": 365,
+      "freshness_days_by_key": {}
+    }
+  },
+  "uncertainties": [
+    "Only three MVP rule families were evaluated; full document completeness and purchase readiness were not assessed."
+  ]
+}

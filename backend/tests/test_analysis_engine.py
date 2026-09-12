@@ -4,22 +4,22 @@ from unittest.mock import patch
 
 from app.models.property_fact import PropertyFact
 from app.services.analysis_engine import AnalysisEngine
-from tests.golden_case import golden_case_facts
+from tests.synthetic_mvp import synthetic_mvp_facts, synthetic_engine
 
 
 def changed(fact, **updates):
-    return PropertyFact.model_validate({**fact.model_dump(), **updates})
+    return PropertyFact.model_validate({**fact.model_dump(exclude_computed_fields=True), **updates})
 
 
 class AnalysisEngineTests(unittest.TestCase):
     def setUp(self):
-        self.facts = golden_case_facts()
-        self.engine = AnalysisEngine()
+        self.facts = synthetic_mvp_facts()
+        self.engine = synthetic_engine()
 
-    def test_golden_case_all_findings_and_linked_evidence(self):
+    def test_synthetic_mvp_all_findings_and_linked_evidence(self):
         assessment = self.engine.analyze(self.facts)
         self.assertEqual(len(assessment.findings), 3)
-        self.assertEqual({f.type for f in assessment.findings}, {"conflict", "risk", "missing_information"})
+        self.assertEqual({f.type for f in assessment.findings}, {"conflict", "documented_fact", "missing_evidence"})
         lookup = {f.fact_id: f for f in self.facts}
         for finding in assessment.findings:
             self.assertTrue(finding.buyer_action)
@@ -63,38 +63,35 @@ class AnalysisEngineTests(unittest.TestCase):
 
     def test_area_documents_and_measurement_bases(self):
         left, right = self.facts[:2]
-        for modified in [changed(right, document_id=left.document_id), changed(right, document_type="EXPOSE")]:
+        for modified in [changed(right, document_id=left.document_id), changed(right, document_applicability="not_applicable")]:
             self.assertEqual(self.engine.analyze([left, modified]).findings, [])
-        left = changed(left, evidence="Living area: 105 m².")
-        right = changed(right, evidence="Usable area: 92 m².")
+        left = changed(left, evidence="Living area: 105 m².", measurement_type="living_area")
+        right = changed(right, evidence="Usable area: 92 m².", measurement_type="usable_area")
         self.assertEqual(self.engine.analyze([left, right]).findings, [])
 
     def test_undocumented_estimated_unallocated_or_paid_costs_not_known(self):
         cost = self.facts[2]
-        for evidence in [
-            "Upcoming roof works: contribution for this unit has not been priced.",
-            "Upcoming roof works: estimated contribution for this unit is €6,500.",
-            "Upcoming roof works: building total €6,500.",
-            "Historical roof works: contribution for this unit was €6,500.",
-            "Upcoming roof works: contribution for this unit is €6,500, already paid.",
-            "No upcoming roof works contribution for this unit of €6,500 is approved.",
+        for updates in [
+            {"source_authority": "unknown"}, {"amount_type": "estimate"},
+            {"scope": "WEG"}, {"amount_type": "actual", "status": "completed"},
+            {"payment_status": "paid"}, {"status": "cancelled"},
         ]:
-            with self.subTest(evidence=evidence):
-                assessment = self.engine.analyze([changed(cost, evidence=evidence)])
+            with self.subTest(updates=updates):
+                assessment = self.engine.analyze([changed(cost, **updates)])
                 self.assertEqual(assessment.financial_impacts, [])
                 self.assertEqual(assessment.findings, [])
 
     def test_other_documented_amount_and_german_evidence(self):
-        cost = changed(self.facts[2], value=7200, evidence="Geplante Dacharbeiten: Anteil dieser Wohnung 7.200 EUR.")
+        cost = changed(self.facts[2], value=7200, evidence="Geplante Dacharbeiten: Anteil dieser Wohnung 7.200 EUR.", raw_value="7.200", number_format="de")
         self.assertEqual(self.engine.analyze([cost]).financial_impacts[0].amount, 7200)
 
     def test_missing_planning_requires_explicit_absence_and_existing_extension(self):
         extension, missing = self.facts[3:]
-        vague = changed(missing, value="Planning documents discussed.", evidence="Planning documents discussed.")
+        vague = changed(missing, value="Planning documents discussed.", evidence="Planning documents discussed.", document_presence="unclear")
         self.assertEqual(self.engine.analyze([extension, vague]).findings, [])
         for text in ("No extension exists.", "A rear extension is proposed."):
-            self.assertEqual(self.engine.analyze([changed(extension, value=text, evidence=text), missing]).findings, [])
-        supplied = changed(missing, fact_id="supplied", value="Planning permission was supplied.", evidence="Planning permission was supplied.")
+            self.assertEqual(self.engine.analyze([changed(extension, value=text, evidence=text, status="proposed"), missing]).findings, [])
+        supplied = changed(missing, fact_id="supplied", value="Planning permission was supplied.", evidence="Planning permission was supplied.", document_presence="supplied")
         self.assertEqual(self.engine.analyze([extension, missing, supplied]).findings, [])
 
     def test_order_independence_repetition_and_no_input_mutation(self):

@@ -1,7 +1,8 @@
 from enum import Enum
+from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictStr, computed_field, model_validator
 
 
 class DocumentType(str, Enum):
@@ -61,11 +62,92 @@ class FactCandidates(StructuredModel):
     facts: list[FactCandidate] = Field(max_length=100)
 
 
-class PropertyFact(FactCandidate):
+class PropertyFact(StructuredModel):
+    """Normalized facts. Legacy ingestion names remain as explicit aliases.
+
+    Unknown metadata is retained, never guessed. Material rules require it to
+    be resolved by an upstream normalization step or a reviewed fixture.
+    """
+
     fact_id: str = Field(min_length=1)
+    key: str = Field(min_length=1)
+    value: StrictFloat | StrictStr | bool
+    unit: str | None = None
+    currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
     document_id: str = Field(min_length=1)
     document_type: DocumentType
     page: int | None = Field(default=None, ge=1)
+    evidence: str = Field(min_length=1)
+    confidence: float = Field(ge=0, le=1)
+    measurement_type: Literal[
+        "living_area", "usable_area", "land_area", "building_usable_area",
+        "tax_area", "advertised_area", "unknown",
+    ] = "unknown"
+    scope: Literal["unit", "building", "WEG", "parking", "storage", "project", "parcel", "unknown"] = "unknown"
+    entity_id: str | None = Field(default=None, min_length=1)
+    project_id: str | None = Field(default=None, min_length=1)
+    status: Literal["planned", "proposed", "approved", "ordered", "ongoing", "completed", "cancelled", "unknown"] = "unknown"
+    amount_type: Literal[
+        "estimate", "budget", "actual", "invoice", "contribution", "reserve",
+        "balance", "fee", "payment", "forecast", "credit", "arrears",
+    ] | None = None
+    frequency: Literal["one-time", "monthly", "annual", "recurring-other", "unknown"] = "unknown"
+    factual_date: date | None = None
+    factual_period: str | None = Field(default=None, min_length=1)
+    document_date: date | None = None
+    evidence_role: Literal["supporting", "contradicting", "contextual"] = "contextual"
+    # The workbook leaves precedence proposed; labels are descriptive, not ranks.
+    source_authority: str = Field(default="unknown", min_length=1)
+    document_applicability: Literal["applicable", "not_applicable", "unknown"] = "unknown"
+    document_presence: Literal["supplied", "missing", "unclear", "not_applicable"] | None = None
+    document_priority: Literal["MUST_HAVE", "CONDITIONAL", "NICE_TO_HAVE"] | None = None
+    requirement_applicable: bool | None = None
+    payer_status: Literal["buyer", "seller", "unit_owner", "unknown"] = "unknown"
+    payment_status: Literal["unpaid", "paid", "unknown"] = "unknown"
+    raw_value: str | None = None
+    number_format: Literal["de", "en"] | None = None
+    allocation_basis: str | None = None
+    allocation_numerator: float | None = None
+    allocation_denominator: float | None = Field(default=None, gt=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def canonical_aliases(cls, value):
+        if not isinstance(value, dict):
+            return value
+        value = dict(value)
+        for canonical, legacy in (
+            ("canonical_key", "key"), ("extraction_confidence", "confidence"),
+            ("source_document_id", "document_id"), ("evidence_snippet", "evidence"),
+        ):
+            if canonical in value:
+                if legacy in value and value[legacy] != value[canonical]:
+                    raise ValueError("Canonical and legacy fact fields disagree.")
+                value[legacy] = value.pop(canonical)
+        # Preserve EUR unit for existing clients while distinguishing currency.
+        if value.get("unit") == "EUR" and not value.get("currency"):
+            value["currency"] = "EUR"
+        return value
+
+    @computed_field
+    @property
+    def canonical_key(self) -> str:
+        return self.key
+
+    @computed_field
+    @property
+    def extraction_confidence(self) -> float:
+        return self.confidence
+
+    @computed_field
+    @property
+    def source_document_id(self) -> str:
+        return self.document_id
+
+    @computed_field
+    @property
+    def evidence_snippet(self) -> str:
+        return self.evidence
 
 
 class PropertyExtraction(StructuredModel):

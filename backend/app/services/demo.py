@@ -38,7 +38,7 @@ def build_demo_assessment() -> PropertyAssessment:
             Finding(
                 id="missing-planning-documentation",
                 severity="medium",
-                type="missing_information",
+                type="missing_evidence",
                 category="planning",
                 title="Missing planning documentation",
                 summary="An alteration is referenced, but supporting planning documents are absent from the supplied demo pack. Compliance remains unverified.",

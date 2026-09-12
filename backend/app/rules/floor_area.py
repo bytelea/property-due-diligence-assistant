@@ -1,44 +1,37 @@
 from itertools import combinations
-
-from app.models.assessment import Finding
-from app.models.property_fact import DocumentType, PropertyFact
-from app.rules.common import documented_number, evidence_links, matches, stable_id
+from app.models.property_fact import PropertyFact
+from app.rules.common import AnalysisPolicy, make_finding, time_key, traceable
 
 
-def area_basis(fact: PropertyFact) -> str | None:
-    for basis, pattern in (
-        ("living", r"living area|wohnfläche"),
-        ("usable", r"usable area|nutzfläche"),
-        ("internal", r"internal area|innenfläche"),
-    ):
-        if matches(pattern, fact.evidence):
-            return basis
-    return None
-
-
-def evaluate(facts: list[PropertyFact], absolute_tolerance: float, relative_tolerance: float) -> list[Finding]:
-    candidates = [f for f in facts if f.key == "floor_area" and f.unit == "m2"
-                  and f.value > 0 and f.document_type in (DocumentType.EXPOSE, DocumentType.FLOOR_PLAN)
-                  and documented_number(f)]
+def evaluate(facts: list[PropertyFact], policy: AnalysisPolicy):
+    if policy.area_absolute_tolerance is None or policy.area_relative_tolerance is None:
+        return []
+    candidates = [f for f in facts if f.canonical_key == "floor_area" and f.unit == "m2"
+                  and isinstance(f.value, float) and f.value > 0 and traceable(f)
+                  and f.measurement_type != "unknown" and f.status != "unknown"
+                  and (policy.as_of is None or f.document_date <= policy.as_of)
+                  and (f.factual_date is not None or f.factual_period is not None)]
     findings = []
     for left, right in combinations(candidates, 2):
-        if left.document_id == right.document_id or left.document_type == right.document_type:
+        if left.document_id == right.document_id:
             continue
-        if area_basis(left) and area_basis(right) and area_basis(left) != area_basis(right):
+        def semantics(f):
+            return (f.scope, f.entity_id, f.project_id, f.measurement_type, time_key(f),
+                    f.status, f.amount_type, f.currency, f.frequency)
+        if semantics(left) != semantics(right):
             continue
         difference = abs(left.value - right.value)
-        threshold = max(absolute_tolerance, relative_tolerance * min(left.value, right.value))
-        if difference <= threshold:
+        if difference <= max(policy.area_absolute_tolerance, policy.area_relative_tolerance * min(left.value, right.value)):
             continue
-        pair = [left, right]
-        findings.append(Finding(
-            id=stable_id("floor-area-conflict", pair), severity="high", type="conflict",
-            category="floor_area", title="Floor area differs across documents",
+        findings.append(make_finding(
+            "A19+A30", [left, right], type="conflict", category="floor_area",
+            severity="NEEDS_VERIFICATION", status="unresolved",
+            title="Floor area differs across comparable documents",
             summary=f"{left.document_type.value} ({left.document_id}) states {left.value:g} m²; "
                     f"{right.document_type.value} ({right.document_id}) states {right.value:g} m². "
-                    f"The difference is {difference:g} m²; the applicable measurement basis needs verification.",
-            evidence=evidence_links(pair),
-            buyer_action="Ask which floor-area figure is legally recognised and request supporting documentation and measurements.",
-            confidence=min(f.confidence for f in pair),
+                    f"Both refer to {left.measurement_type}, the same entity/scope and factual time/status; the difference is {difference:g} m².",
+            uncertainty_reason="The applicable legally recognised area remains unverified; neither document is silently substituted for the other.",
+            buyer_action="Ask which floor-area figure is legally recognised and request authoritative supporting documentation and measurements.",
+            assumptions=["Materiality uses caller-supplied tolerances; numerical policy is open in workbook D14."],
         ))
     return findings

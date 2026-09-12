@@ -13,3 +13,8 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+
+private_specs/
+*.pdf
+*.PDF
+.DS_Store

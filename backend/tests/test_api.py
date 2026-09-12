@@ -26,7 +26,7 @@ class ApiSmokeTests(unittest.TestCase):
         area = findings["floor-area-conflict"]
         self.assertIn("105 m²", area["evidence"][0]["excerpt"])
         self.assertIn("92 m²", area["evidence"][1]["excerpt"])
-        self.assertEqual(findings["missing-planning-documentation"]["type"], "missing_information")
+        self.assertEqual(findings["missing-planning-documentation"]["type"], "missing_evidence")
         for finding in findings.values():
             self.assertTrue(finding["evidence"])
             self.assertTrue(finding["buyer_action"])

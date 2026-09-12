@@ -1,0 +1,104 @@
+{
+  "case_role": "primary_regression",
+  "source": "Rulebook.xlsx / 05_Golden_Test_Case; semantic probes only, no raw document extraction",
+  "live_demo_case": "not_selected",
+  "synthetic_cases": "separate in synthetic_mvp_*.json",
+  "expectations": [
+    {
+      "id": "D01",
+      "expected_finding": "Unit / asset identity",
+      "coverage": "semantic_guardrail_probe_only",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D02",
+      "expected_finding": "Ownership share",
+      "coverage": "deferred_outside_three_rule_scope",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D03",
+      "expected_finding": "Tenancy economics",
+      "coverage": "deferred_outside_three_rule_scope",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D04",
+      "expected_finding": "Parking ownership vs lease scope",
+      "coverage": "deferred_outside_three_rule_scope",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D05",
+      "expected_finding": "Major Strangsanierung project",
+      "coverage": "semantic_guardrail_probe_only",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D06",
+      "expected_finding": "Temporary uninhabitability",
+      "coverage": "deferred_outside_three_rule_scope",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D07",
+      "expected_finding": "Potential internal renovation cost",
+      "coverage": "semantic_guardrail_probe_only",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D08",
+      "expected_finding": "Reserves have different scopes",
+      "coverage": "deferred_outside_three_rule_scope",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D09",
+      "expected_finding": "TG repair funded from TG reserve",
+      "coverage": "semantic_guardrail_probe_only",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D10",
+      "expected_finding": "2023 budget includes works and special advance",
+      "coverage": "semantic_guardrail_probe_only",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D11",
+      "expected_finding": "Historical annual-account settlement",
+      "coverage": "semantic_guardrail_probe_only",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D12",
+      "expected_finding": "Building-level energy performance",
+      "coverage": "deferred_outside_three_rule_scope",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D13",
+      "expected_finding": "Tax area is not Wohnfl\u00e4che",
+      "coverage": "semantic_guardrail_probe_only",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D14",
+      "expected_finding": "Registered rights/restrictions",
+      "coverage": "deferred_outside_three_rule_scope",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D15",
+      "expected_finding": "Registered Grundschuld",
+      "coverage": "deferred_outside_three_rule_scope",
+      "full_detection_acceptance": "not_run"
+    },
+    {
+      "id": "D16",
+      "expected_finding": "Current project-status gap",
+      "coverage": "semantic_guardrail_probe_only",
+      "full_detection_acceptance": "not_run"
+    }
+  ]
+}
