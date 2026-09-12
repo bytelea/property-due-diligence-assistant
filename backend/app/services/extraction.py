@@ -8,7 +8,7 @@ from app.models.property_fact import (
 )
 from app.prompts.property_extraction import EXTRACTION_PROMPT
 from app.services.classification import DocumentClassificationService
-from app.services.structured_model import ExtractionError, GeminiStructuredModel, StructuredModelClient
+from app.services.structured_model import ExtractionError, get_structured_model, StructuredModelClient
 
 
 def number_occurs_in_evidence(value: float, evidence: str) -> bool:
@@ -72,7 +72,7 @@ class PropertyExtractionService:
     """Orchestrates classification and extraction; deliberately runs no rules."""
 
     def __init__(self, model: StructuredModelClient | None = None):
-        model = model if model is not None else GeminiStructuredModel()
+        model = model if model is not None else get_structured_model()
         self.classifier = DocumentClassificationService(model)
         self.extractor = PropertyFactExtractionService(model)
 

@@ -8,6 +8,7 @@ authentication; do not ship credential files.
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator
@@ -30,6 +31,8 @@ class Settings(BaseSettings):
     google_cloud_project: str = "aiwomen26ham-4410"
     google_cloud_location: str = "europe-west3"
     gemini_model: str = ""
+    model_provider: Literal["vertex", "anymize"] = "vertex"
+    anymize_model: str = ""
     allowed_origins: str = ""
 
     @field_validator("allowed_origins")

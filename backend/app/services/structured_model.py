@@ -67,3 +67,14 @@ class GeminiStructuredModel:
         except Exception:
             # Provider/ADC errors may include request content; never forward them.
             raise ExtractionError(502, "Property extraction provider request failed.") from None
+
+
+def get_structured_model() -> StructuredModelClient:
+    """Explicit selection only. A provider error never switches providers."""
+    provider = get_settings().model_provider
+    if provider == "vertex":
+        return GeminiStructuredModel()
+    if provider == "anymize":
+        from app.services.anymize_model import AnymizeStructuredModel
+        return AnymizeStructuredModel()
+    raise ExtractionError(503, "Property extraction provider is not configured.")
