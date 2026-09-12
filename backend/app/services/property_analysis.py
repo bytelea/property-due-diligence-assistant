@@ -8,6 +8,7 @@ from app.models.assessment import PropertyAssessment
 from app.models.document import ProcessedDocument
 from app.models.property_fact import AnonymizedDocument, PropertyFact
 from app.services.analysis_engine import AnalysisEngine
+from app.services.normalization import normalize_facts
 from app.services.anymize import AnymizeError, AnymizeService, get_anymize_service
 from app.services.extraction import PropertyExtractionService, get_extraction_service
 from app.services.pdf_uploads import PdfDocument
@@ -62,7 +63,11 @@ class PropertyAnalysisService:
                 document_type=extraction.classification.document_type, fact_ids=sorted(f.fact_id for f in facts),
             ))
         try:
-            assessment = self.engine.analyze(combined)
+            canonical = normalize_facts(combined)
+        except Exception:
+            raise PropertyAnalysisError(502, "Document normalization failed; no assessment was completed.") from None
+        try:
+            assessment = self.engine.analyze(canonical)
         except Exception:
             raise PropertyAnalysisError(502, "Combined property analysis failed; no assessment was completed.") from None
         assessment.documents = processed

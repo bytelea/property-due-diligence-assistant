@@ -1,7 +1,7 @@
 """Pure extraction-to-canonical boundary. No rules, IO, clock or settings.
 
-Existing routes retain legacy facts until the canonical rule migration. Call
-normalize_facts after extraction and before a future canonical evaluator.
+The multi-document route calls normalize_facts after evidence validation and
+before canonical rule evaluation.
 Ambiguous legacy semantics fail explicitly; the input remains unmodified.
 """
 from decimal import Decimal, InvalidOperation

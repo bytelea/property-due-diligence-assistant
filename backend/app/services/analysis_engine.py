@@ -5,7 +5,7 @@ from dataclasses import asdict
 from datetime import date, datetime
 
 from app.models.assessment import PropertyAssessment
-from app.models.property_fact import PropertyFact
+from app.models.property_fact import PropertyFact, CanonicalPropertyFact
 from app.rules import floor_area, planned_works, planning_documents
 from app.rules.common import AnalysisPolicy, RULEBOOK_VERSION, current, traceable
 
@@ -21,6 +21,13 @@ class AnalysisEngine:
         self.analysis_timestamp = analysis_timestamp
 
     def analyze(self, facts: list[PropertyFact]) -> PropertyAssessment:
+        # Retain the legacy direct-call contract for existing fixture consumers.
+        # Production normalizes first and always selects the canonical evaluator.
+        if not facts or all(isinstance(f, CanonicalPropertyFact) for f in facts):
+            from app.services.canonical_analysis import analyze_canonical
+            return analyze_canonical(facts, self.policy, self.analysis_timestamp)
+        if any(isinstance(f, CanonicalPropertyFact) for f in facts):
+            raise ValueError("Mixed canonical and legacy facts are not supported.")
         unique = {}
         for fact in facts:
             fact = PropertyFact.model_validate(fact.model_dump())

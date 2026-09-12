@@ -8,6 +8,8 @@ from app.models.canonical import (
     ResolutionOwner, ResolutionTiming, RULE_RESULTS,
 )
 from app.models.document import ProcessedDocument
+from app.models.property_fact import CanonicalPropertyFact
+from app.models.rule_evaluation import RuleEvaluation
 
 
 class Evidence(BaseModel):
@@ -43,6 +45,8 @@ class Finding(BaseModel):
     status: Literal["open", "verified", "unresolved", "informational"] | FindingStatus = "unresolved"
     linked_facts: List[str] = Field(default_factory=list)
     rule_id: str = "legacy-demo"
+    rule_evaluation_id: Optional[str] = None
+    canonical_category: Optional[FindingCategory] = None
     rulebook_version: str = "legacy-demo"
     model_version: str = "none"
     scope: str = "unknown"
@@ -88,6 +92,11 @@ class Finding(BaseModel):
         if any(i.status != "estimated" for i in self.possible_financial_impacts):
             raise ValueError("Possible financial impacts must be labelled estimated.")
         return self
+
+    @computed_field
+    @property
+    def resolution_status(self) -> str:
+        return self.status.upper()
 
     @computed_field
     @property
@@ -155,4 +164,36 @@ class PropertyAssessment(BaseModel):
     documents: List[ProcessedDocument] = Field(default_factory=list)
     # Technical completion is independent of decision readiness. None = not reported.
     technical_processing_completed: Optional[bool] = None
+    canonical_facts: List[CanonicalPropertyFact] = Field(default_factory=list)
+    rule_evaluations: List[RuleEvaluation] = Field(default_factory=list)
+    rule_evaluation_completeness: Literal["not_evaluated", "complete", "incomplete"] = "not_evaluated"
     processing_status: Optional[Literal["completed", "incomplete"]] = None
+
+    @model_validator(mode="after")
+    def validate_canonical_trace(self):
+        if self.rule_evaluation_completeness == "not_evaluated":
+            return self
+        facts = {f.fact_id: f for f in self.canonical_facts}
+        evaluations = {e.evaluation_id: e for e in self.rule_evaluations}
+        if len(facts) != len(self.canonical_facts) or len(evaluations) != len(self.rule_evaluations):
+            raise ValueError("Canonical trace identifiers must be unique.")
+        if self.rule_evaluation_completeness == "complete" and any(e.evaluation_status == "MISSING_INPUTS" for e in evaluations.values()):
+            raise ValueError("Missing inputs cannot be labelled complete rule evaluation.")
+        for evaluation in evaluations.values():
+            if any(i not in facts for i in evaluation.triggering_fact_ids):
+                raise ValueError("Evaluation references an unknown fact.")
+        for finding in self.findings:
+            evaluation = evaluations.get(finding.rule_evaluation_id)
+            if evaluation is None or evaluation.evaluation_status != "TRIGGERED" or finding.rule_id != evaluation.rule_id:
+                raise ValueError("Finding requires a matching triggered evaluation.")
+            if finding.rule_result != evaluation.rule_result or finding.severity != evaluation.severity:
+                raise ValueError("Finding result and severity must match its evaluation.")
+            if sorted(finding.linked_facts) != sorted(evaluation.triggering_fact_ids):
+                raise ValueError("Finding and evaluation fact references disagree.")
+            if sorted(e.fact_id for e in finding.evidence) != sorted(finding.linked_facts):
+                raise ValueError("Finding evidence must cover every triggering fact.")
+            for evidence in finding.evidence:
+                fact = facts.get(evidence.fact_id)
+                if fact is None or (evidence.document_id, evidence.page, evidence.excerpt) != (fact.document_id, fact.page, fact.evidence):
+                    raise ValueError("Finding evidence does not match the canonical fact.")
+        return self

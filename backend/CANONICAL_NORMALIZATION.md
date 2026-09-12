@@ -11,7 +11,7 @@ from app.services.normalization import normalize_facts
 
 # extraction contains evidence quoted only from anonymized text.
 canonical_facts = normalize_facts(extraction.facts)
-# Future canonical rule evaluator consumes canonical_facts.
+# The production analysis engine consumes canonical_facts.
 ```
 
 `CanonicalPropertyFact` is a `PropertyFact` subclass with strictly canonical enums.
@@ -19,12 +19,13 @@ Normalization revalidates its inputs, returns new objects, preserves order and I
 and is idempotent. It performs no IO, model calls, rule evaluation, document
 inventory inference, authority ranking, date synthesis or financial allocation.
 
-The existing routes and legacy rules continue to use their existing facts. The
-canonical boundary is callable but deliberately not substituted into the legacy
-engine: uppercase canonical values would change that engine's comparisons. This
-phase does not claim that live extraction now supplies missing page, scope,
-identity, date or authority metadata. A later migration must enrich those inputs
-from anonymized evidence and connect the canonical evaluator explicitly.
+Phase 2 connects this boundary to `/properties/analyze`: source-validated
+anonymized extraction facts are normalized before entering the canonical evaluator.
+Normalization failures return a sanitized 502 and no assessment. The direct-call
+legacy engine remains available for prior fixture consumers; production canonical
+facts never enter its legacy rule modules. See `CANONICAL_PIPELINE.md`.
+Live extraction still does not fabricate missing page, scope, identity, date or
+authority metadata: those gaps are now explicit rule evaluations.
 
 ## Compatibility
 
