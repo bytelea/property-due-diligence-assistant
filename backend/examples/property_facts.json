@@ -1,0 +1,53 @@
+{
+  "document_id": "demo-anonymized-document",
+  "classification": {
+    "document_type": "EXPOSE",
+    "confidence": 0.9
+  },
+  "facts": [
+    {
+      "key": "floor_area",
+      "value": 105.0,
+      "unit": "m2",
+      "evidence": "Wohnfläche: 105 m².",
+      "confidence": 0.98,
+      "fact_id": "4cbd5a77-62c5-52dc-b56d-3d92986eaf20",
+      "document_id": "demo-anonymized-document",
+      "document_type": "EXPOSE",
+      "page": null
+    },
+    {
+      "key": "planned_works_cost",
+      "value": 6500.0,
+      "unit": "EUR",
+      "evidence": "Geplante Dacharbeiten: Anteil dieser Wohnung 6.500 EUR.",
+      "confidence": 0.95,
+      "fact_id": "558c3b3e-9565-5422-a3b7-ad24ee6943ce",
+      "document_id": "demo-anonymized-document",
+      "document_type": "EXPOSE",
+      "page": null
+    },
+    {
+      "key": "extension_reference",
+      "value": "Rear extension added.",
+      "unit": null,
+      "evidence": "Rear extension added.",
+      "confidence": 0.9,
+      "fact_id": "cec23cbf-94b4-5003-ae66-e992465a2150",
+      "document_id": "demo-anonymized-document",
+      "document_type": "EXPOSE",
+      "page": null
+    },
+    {
+      "key": "planning_documentation_reference",
+      "value": "Planning permission documentation was not supplied.",
+      "unit": null,
+      "evidence": "Planning permission documentation was not supplied.",
+      "confidence": 0.9,
+      "fact_id": "9b9dcfe3-d828-5725-b2c7-fdda232036bd",
+      "document_id": "demo-anonymized-document",
+      "document_type": "EXPOSE",
+      "page": null
+    }
+  ]
+}
