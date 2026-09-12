@@ -4,3 +4,12 @@ __pycache__/
 .env
 .env.*
 tests/
+venv/
+.pytest_cache/
+**/.env
+**/.env.*
+**/credentials.json
+**/service-account.json
+**/application_default_credentials.json
+**/*.key
+**/*.pem
