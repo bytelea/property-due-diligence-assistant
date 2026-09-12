@@ -1,0 +1,57 @@
+[
+  {
+    "key": "floor_area",
+    "value": 105.0,
+    "unit": "m2",
+    "evidence": "Floor area: 105 m².",
+    "confidence": 0.95,
+    "fact_id": "area-listing",
+    "document_id": "listing",
+    "document_type": "EXPOSE",
+    "page": 1
+  },
+  {
+    "key": "floor_area",
+    "value": 92.0,
+    "unit": "m2",
+    "evidence": "Floor area: 92 m².",
+    "confidence": 0.95,
+    "fact_id": "area-plan",
+    "document_id": "plan",
+    "document_type": "FLOOR_PLAN",
+    "page": 1
+  },
+  {
+    "key": "planned_works_cost",
+    "value": 6500.0,
+    "unit": "EUR",
+    "evidence": "Upcoming roof works: contribution for this unit is €6,500.",
+    "confidence": 0.95,
+    "fact_id": "works",
+    "document_id": "minutes",
+    "document_type": "CONDOMINIUM_ASSOCIATION_MINUTES",
+    "page": 1
+  },
+  {
+    "key": "extension_reference",
+    "value": "Rear extension exists.",
+    "unit": null,
+    "evidence": "Rear extension exists.",
+    "confidence": 0.95,
+    "fact_id": "extension",
+    "document_id": "listing",
+    "document_type": "EXPOSE",
+    "page": 1
+  },
+  {
+    "key": "planning_documentation_reference",
+    "value": "Planning permission documentation for the rear extension was not supplied.",
+    "unit": null,
+    "evidence": "Planning permission documentation for the rear extension was not supplied.",
+    "confidence": 0.95,
+    "fact_id": "planning-missing",
+    "document_id": "pack-inventory",
+    "document_type": "OTHER",
+    "page": 1
+  }
+]

@@ -7,6 +7,9 @@ class Evidence(BaseModel):
     source: str = Field(min_length=1)
     excerpt: str = Field(min_length=1)
     page: Optional[int] = Field(default=None, ge=1)
+    fact_id: Optional[str] = None
+    document_id: Optional[str] = None
+    document_type: Optional[str] = None
 
 
 class Finding(BaseModel):
