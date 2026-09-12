@@ -2,6 +2,8 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, computed_field
 
+from app.models.document import ProcessedDocument
+
 
 class Evidence(BaseModel):
     source: str = Field(min_length=1)
@@ -10,6 +12,7 @@ class Evidence(BaseModel):
     fact_id: Optional[str] = None
     document_id: Optional[str] = None
     document_type: Optional[str] = None
+    document_name: Optional[str] = None
     relation: Literal["supports", "contradicts", "context"] = "supports"
     source_authority: str = "unknown"
     extraction_confidence: Optional[float] = Field(default=None, ge=0, le=1)
@@ -102,3 +105,5 @@ class PropertyAssessment(BaseModel):
     decision_readiness: Literal["READY", "READY_WITH_VERIFICATION", "NOT_DECISION_READY"] = "NOT_DECISION_READY"
     run_metadata: dict = Field(default_factory=dict)
     uncertainties: List[str] = Field(default_factory=list)
+    documents: List[ProcessedDocument] = Field(default_factory=list)
+    processing_status: Optional[Literal["completed", "incomplete"]] = None

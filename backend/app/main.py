@@ -10,6 +10,8 @@ from app.services.anymize import AnymizeError, AnymizeService, get_anymize_servi
 from app.services.demo import build_demo_assessment
 from app.services.extraction import PropertyExtractionService, get_extraction_service
 from app.services.structured_model import ExtractionError
+from app.services.pdf_uploads import UploadValidationError, read_pdf_documents
+from app.services.property_analysis import PropertyAnalysisError, PropertyAnalysisService, get_property_analysis_service
 
 app = FastAPI(title="Property Due Diligence Assistant", version="0.1.0")
 
@@ -70,3 +72,22 @@ async def analyze(
         except ExtractionError as error:
             raise HTTPException(error.status_code, str(error)) from None
     return AnalysisResponse(anonymized_text=text, extraction=extraction)
+
+
+@app.post("/properties/analyze", response_model=PropertyAssessment)
+async def analyze_property(
+    request: Request,
+    files: list[UploadFile],
+    service: PropertyAnalysisService = Depends(get_property_analysis_service),
+) -> PropertyAssessment:
+    try:
+        form = await request.form()
+        if any(key != "files" and isinstance(value, StarletteUploadFile) for key, value in form.multi_items()):
+            raise HTTPException(400, "Use the files field for every PDF upload.")
+        documents = await read_pdf_documents(files, MAX_PDF_BYTES)
+        return await service.analyze(documents)
+    except (UploadValidationError, PropertyAnalysisError) as error:
+        raise HTTPException(error.status_code, str(error)) from None
+    finally:
+        for file in files:
+            await file.close()
