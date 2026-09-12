@@ -76,6 +76,7 @@ class PropertyAnalysisService:
         assessment.run_metadata["input_document_ids"] = sorted(names)
         assessment.run_metadata["processed_document_count"] = len(processed)
         assessment.run_metadata["processing_stages_completed"] = True
+        assessment.technical_processing_completed = True
         assessment.processing_status = "incomplete" if assessment.decision_readiness == "NOT_DECISION_READY" else "completed"
         fingerprint = json.dumps({"engine_assessment_id": assessment.id, "document_ids": sorted(names)}, sort_keys=True)
         assessment.id = "assessment-" + hashlib.sha256(fingerprint.encode()).hexdigest()[:24]

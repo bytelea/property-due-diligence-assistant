@@ -2,7 +2,12 @@ from enum import Enum
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictStr, computed_field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictFloat, StrictStr, computed_field, model_validator
+
+
+from app.models.canonical import (MeasurementType, Scope, FactStatus, AmountType, Frequency,
+    Payer, EvidenceRole, DocumentPresence, LayoutStatus, ClaimVerificationStatus,
+    PlanningEvidenceStatus, ConditionEvidenceType)
 
 
 class DocumentType(str, Enum):
@@ -71,7 +76,7 @@ class PropertyFact(StructuredModel):
 
     fact_id: str = Field(min_length=1)
     key: str = Field(min_length=1)
-    value: StrictFloat | StrictStr | bool
+    value: StrictFloat | StrictStr | bool | dict[str, JsonValue] | list[JsonValue]
     unit: str | None = None
     currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
     document_id: str = Field(min_length=1)
@@ -82,27 +87,34 @@ class PropertyFact(StructuredModel):
     measurement_type: Literal[
         "living_area", "usable_area", "land_area", "building_usable_area",
         "tax_area", "advertised_area", "unknown",
-    ] = "unknown"
-    scope: Literal["unit", "building", "WEG", "parking", "storage", "project", "parcel", "unknown"] = "unknown"
+    ] | MeasurementType = "unknown"
+    scope: Literal["unit", "building", "WEG", "parking", "storage", "project", "parcel", "unknown"] | Scope = "unknown"
     entity_id: str | None = Field(default=None, min_length=1)
     project_id: str | None = Field(default=None, min_length=1)
-    status: Literal["planned", "proposed", "approved", "ordered", "ongoing", "completed", "cancelled", "unknown"] = "unknown"
+    status: Literal["planned", "proposed", "approved", "ordered", "ongoing", "completed", "cancelled", "unknown"] | FactStatus = "unknown"
     amount_type: Literal[
         "estimate", "budget", "actual", "invoice", "contribution", "reserve",
         "balance", "fee", "payment", "forecast", "credit", "arrears",
-    ] | None = None
-    frequency: Literal["one-time", "monthly", "annual", "recurring-other", "unknown"] = "unknown"
+    ] | AmountType | None = None
+    frequency: Literal["one-time", "monthly", "annual", "recurring-other", "unknown"] | Frequency = "unknown"
     factual_date: date | None = None
     factual_period: str | None = Field(default=None, min_length=1)
+    period_start: date | None = None
+    period_end: date | None = None
+    current_status_date: date | None = None
     document_date: date | None = None
-    evidence_role: Literal["supporting", "contradicting", "contextual"] = "contextual"
+    layout_status: LayoutStatus | None = None
+    claim_verification_status: ClaimVerificationStatus | None = None
+    planning_evidence_status: PlanningEvidenceStatus | None = None
+    condition_evidence_type: ConditionEvidenceType | None = None
+    evidence_role: Literal["supporting", "contradicting", "contextual"] | EvidenceRole = "contextual"
     # The workbook leaves precedence proposed; labels are descriptive, not ranks.
     source_authority: str = Field(default="unknown", min_length=1)
     document_applicability: Literal["applicable", "not_applicable", "unknown"] = "unknown"
-    document_presence: Literal["supplied", "missing", "unclear", "not_applicable"] | None = None
+    document_presence: Literal["supplied", "missing", "unclear", "not_applicable"] | DocumentPresence | None = None
     document_priority: Literal["MUST_HAVE", "CONDITIONAL", "NICE_TO_HAVE"] | None = None
     requirement_applicable: bool | None = None
-    payer_status: Literal["buyer", "seller", "unit_owner", "unknown"] = "unknown"
+    payer_status: Literal["buyer", "seller", "unit_owner", "unknown"] | Payer = "unknown"
     payment_status: Literal["unpaid", "paid", "unknown"] = "unknown"
     raw_value: str | None = None
     number_format: Literal["de", "en"] | None = None
@@ -129,6 +141,12 @@ class PropertyFact(StructuredModel):
             value["currency"] = "EUR"
         return value
 
+    @model_validator(mode="after")
+    def validate_period(self):
+        if self.period_start and self.period_end and self.period_start > self.period_end:
+            raise ValueError("Period start must not follow period end.")
+        return self
+
     @computed_field
     @property
     def canonical_key(self) -> str:
@@ -148,6 +166,19 @@ class PropertyFact(StructuredModel):
     @property
     def evidence_snippet(self) -> str:
         return self.evidence
+
+
+class CanonicalPropertyFact(PropertyFact):
+    """Explicit canonical boundary; legacy PropertyFact serialization is unchanged."""
+
+    measurement_type: MeasurementType = MeasurementType.UNKNOWN
+    scope: Scope = Scope.UNKNOWN
+    status: FactStatus = FactStatus.UNKNOWN
+    amount_type: AmountType | None = None
+    frequency: Frequency = Frequency.UNKNOWN
+    payer_status: Payer = Payer.UNKNOWN
+    evidence_role: EvidenceRole = EvidenceRole.CONTEXT
+    document_presence: DocumentPresence | None = None
 
 
 class PropertyExtraction(StructuredModel):
