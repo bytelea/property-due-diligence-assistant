@@ -184,9 +184,14 @@ class PropertyAssessment(BaseModel):
                 raise ValueError("Evaluation references an unknown fact.")
         for finding in self.findings:
             evaluation = evaluations.get(finding.rule_evaluation_id)
-            if evaluation is None or evaluation.evaluation_status != "TRIGGERED" or finding.rule_id != evaluation.rule_id:
+            verification = evaluation is not None and evaluation.evaluation_status == "MISSING_INPUTS"
+            if evaluation is None or (evaluation.evaluation_status != "TRIGGERED" and not verification) or finding.rule_id != evaluation.rule_id:
                 raise ValueError("Finding requires a matching triggered evaluation.")
-            if finding.rule_result != evaluation.rule_result or finding.severity != evaluation.severity:
+            if verification and (finding.severity != "NEEDS_VERIFICATION" or finding.evaluation_status != "NEEDS_INPUT"
+                                 or finding.status not in ("unresolved", "UNRESOLVED") or finding.type != "missing_evidence"
+                                 or finding.financial_impact is not None or finding.known_financial_impacts or finding.possible_financial_impacts):
+                raise ValueError("Verification findings must preserve uncertainty without financial claims.")
+            if finding.rule_result != evaluation.rule_result or (not verification and finding.severity != evaluation.severity):
                 raise ValueError("Finding result and severity must match its evaluation.")
             if sorted(finding.linked_facts) != sorted(evaluation.triggering_fact_ids):
                 raise ValueError("Finding and evaluation fact references disagree.")

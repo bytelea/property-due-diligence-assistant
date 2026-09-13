@@ -63,8 +63,9 @@ class PropertyAnalysisTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         result = response.json()
         self.assertEqual(len(result["documents"]), 2)
-        self.assertEqual(len(result["findings"]), 1)
-        finding = result["findings"][0]
+        conflicts = [f for f in result["findings"] if f["type"] == "conflict"]
+        self.assertEqual(len(conflicts), 1)
+        finding = conflicts[0]
         self.assertEqual(finding["type"], "conflict")
         self.assertEqual(finding["rule_id"], "A19+A30")
         self.assertEqual(len(finding["linked_facts"]), 2)
@@ -240,7 +241,8 @@ class PropertyAnalysisTests(unittest.TestCase):
     def test_default_engine_policy_is_unchanged(self):
         del app.dependency_overrides[get_analysis_engine]
         result = self.upload().json()
-        self.assertEqual(result["findings"], [])
+        self.assertTrue(result["findings"])
+        self.assertTrue(all(f["evaluation_status"] == "NEEDS_INPUT" for f in result["findings"]))
         self.assertEqual(result["processing_status"], "incomplete")
         self.assertIsNone(result["run_metadata"]["policy"]["area_absolute_tolerance"])
         self.assertIsNone(result["run_metadata"]["policy"]["max_document_age_days"])

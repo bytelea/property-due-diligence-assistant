@@ -24,13 +24,21 @@ def analyze_canonical(facts, policy, analysis_timestamp=None):
         records, generated = rule(facts, policy)
         evaluations.extend(records)
         findings.extend(generated)
+    from app.services.finding_projection import verification_finding
+    projected = {f.rule_evaluation_id for f in findings}
+    facts_by_id = {f.fact_id: f for f in facts}
+    for evaluation in evaluations:
+        if evaluation.evaluation_id not in projected:
+            finding = verification_finding(evaluation, facts_by_id)
+            if finding is not None:
+                findings.append(finding)
     evaluations.sort(key=lambda e: (e.rule_id, e.evaluation_id))
     findings.sort(key=lambda f: (f.category, f.id))
     incomplete = any(e.evaluation_status == "MISSING_INPUTS" for e in evaluations)
     impacts = [f.financial_impact for f in findings if f.financial_impact is not None]
     metadata = {
         "model_version": "none:deterministic", "rulebook_version": canonical_mvp.RULEBOOK_VERSION,
-        "engine_version": "canonical-mvp-2", "analysis_timestamp": analysis_timestamp.isoformat() if analysis_timestamp else None,
+        "engine_version": "canonical-mvp-3", "analysis_timestamp": analysis_timestamp.isoformat() if analysis_timestamp else None,
         "input_document_ids": sorted({f.document_id for f in facts}),
         "policy": {k: v.isoformat() if isinstance(v, date) else v for k, v in asdict(policy).items()},
         "evaluation_scope": "Three bounded MVP families only; not full B01/B02/B35 or B01-B38 coverage.",

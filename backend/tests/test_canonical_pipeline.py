@@ -42,7 +42,8 @@ class CanonicalEvaluationTests(unittest.TestCase):
 
     def test_unconfigured_policy_explicitly_blocks_evaluation(self):
         assessment = AnalysisEngine().analyze(self.facts)
-        self.assertEqual(assessment.findings, [])
+        self.assertTrue(assessment.findings)
+        self.assertTrue(all(f.severity == "NEEDS_VERIFICATION" for f in assessment.findings))
         self.assertEqual(assessment.rule_evaluation_completeness, "incomplete")
         missing = {m for e in assessment.rule_evaluations for m in e.missing_inputs}
         self.assertIn("policy.area_absolute_tolerance", missing)
@@ -111,7 +112,7 @@ class CanonicalEvaluationTests(unittest.TestCase):
 
     def test_planning_silence_is_missing_input_not_illegality(self):
         result = self.result([self.facts[3]])
-        self.assertEqual(result.findings, [])
+        self.assertEqual(result.findings[0].severity, "NEEDS_VERIFICATION")
         self.assertEqual(self.evaluation([self.facts[3]], "B35").evaluation_status, "MISSING_INPUTS")
         finding = self.result(self.facts[3:]).findings[0]
         self.assertEqual(finding.rule_result, "EVIDENCE_MISSING")
