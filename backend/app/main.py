@@ -92,7 +92,7 @@ async def analyze_property(
         form = await request.form()
         if any(key != "files" and isinstance(value, StarletteUploadFile) for key, value in form.multi_items()):
             raise HTTPException(400, "Use the files field for every PDF upload.")
-        documents = await read_pdf_documents(files, MAX_PDF_BYTES)
+        documents = await read_pdf_documents(files, MAX_PDF_BYTES, isolate_validation=True)
         return await service.analyze(documents)
     except (UploadValidationError, PropertyAnalysisError) as error:
         raise HTTPException(error.status_code, str(error)) from None

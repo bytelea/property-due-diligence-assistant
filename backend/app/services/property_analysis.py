@@ -12,7 +12,7 @@ from app.services.analysis_engine import AnalysisEngine
 from app.services.normalization import normalize_facts
 from app.services.anymize import AnymizeError, AnymizeService, get_anymize_service
 from app.services.extraction import PropertyExtractionService, get_extraction_service
-from app.services.pdf_uploads import PdfDocument
+from app.services.pdf_uploads import PdfDocument, UploadValidationError
 from app.services.structured_model import ExtractionError
 
 
@@ -35,26 +35,18 @@ class PropertyAnalysisService:
         for ordinal, document in enumerate(sorted(documents, key=lambda item: item.document_id), start=1):
             failed = ProcessedDocument(document_id=document.document_id, document_name=document.names[0],
                 document_names=document.names, document_type="OTHER", fact_ids=[], processing_status="failed")
-            try:
-                anonymized = await self.anonymizer.anonymize_pdf(document.content)
-            except AnymizeError as error:
-                if error.status_code in (401, 403, 503) or error.global_failure:
-                    raise PropertyAnalysisError(error.status_code, "Document anonymization failed; no assessment was completed.") from None
-                last_error = PropertyAnalysisError(error.status_code, "Document anonymization failed; no assessment was completed.")
-                processed.append(failed)
-                continue
-            except Exception:
-                last_error = PropertyAnalysisError(502, "Document anonymization failed; no assessment was completed.")
-                processed.append(failed)
-                continue
-            if not isinstance(anonymized, str) or not anonymized.strip() or len(anonymized) > 100_000:
-                last_error = PropertyAnalysisError(502, "Document anonymization returned no usable text; no assessment was completed.")
-                processed.append(failed)
-                continue
+            anonymized = None
             for attempt in range(2):
                 diagnostic_token = begin(ordinal)
                 stage, category = "model_output_received", "unexpected_extraction_error"
                 try:
+                    if document.validation_error is not None:
+                        raise document.validation_error
+                    if anonymized is None:
+                        anonymized = await self.anonymizer.anonymize_pdf(document.content)
+                        if not isinstance(anonymized, str) or not anonymized.strip() or len(anonymized) > 100_000:
+                            anonymized = None
+                            raise AnymizeError(502, "Document anonymization returned no usable text; no assessment was completed.")
                     extraction = await self.extractor.extract(AnonymizedDocument(document_id=document.document_id, text=anonymized))
                     stage, category = "provenance_validation", "provenance_validation_failed"
                     if extraction.document_id != document.document_id:
@@ -69,8 +61,18 @@ class PropertyAnalysisService:
                             raise ValueError("Mismatched fact provenance")
                         facts.append(fact)
                     canonical_document = normalize_facts(facts)
-                    emit("provenance_validation", provenance_validated=True, fact_count=len(facts))
+                    completed = ProcessedDocument(
+                        document_id=document.document_id, document_name=document.names[0], document_names=document.names,
+                        document_type=extraction.classification.document_type, fact_ids=sorted(f.fact_id for f in canonical_document))
                     emit("document_extraction_complete", "empty_fact_set" if not facts else None, fact_count=len(facts))
+                except UploadValidationError as error:
+                    last_error = PropertyAnalysisError(error.status_code, error.message)
+                    processed.append(failed)
+                    break
+                except AnymizeError as error:
+                    if error.status_code in (401, 403, 503) or error.global_failure:
+                        raise PropertyAnalysisError(error.status_code, "Document anonymization failed; no assessment was completed.") from None
+                    last_error = PropertyAnalysisError(error.status_code, "Document anonymization failed; no assessment was completed.")
                 except ExtractionError as error:
                     if error.status_code in (401, 403, 503) and not getattr(error, "retryable", False):
                         raise PropertyAnalysisError(error.status_code, "Property extraction provider is unavailable.") from None
@@ -81,9 +83,7 @@ class PropertyAnalysisService:
                     last_error = PropertyAnalysisError(502, "Document extraction failed; no assessment was completed.")
                 else:
                     combined.extend(canonical_document)
-                    processed.append(ProcessedDocument(
-                        document_id=document.document_id, document_name=document.names[0], document_names=document.names,
-                        document_type=extraction.classification.document_type, fact_ids=sorted(f.fact_id for f in canonical_document)))
+                    processed.append(completed)
                     break
                 finally:
                     end(diagnostic_token)

@@ -10,9 +10,12 @@ from app.services.structured_model import ExtractionError
 from app.models.property_fact import PropertyExtraction, PropertyFact, DocumentClassification
 
 class PartialAnalysisTests(unittest.TestCase):
-    def run_batch(self, failures=(), repair=False, global_error=False):
+    def run_batch(self, failures=(), repair=False, global_error=False, count=6, ocr_fail=False):
         attempts = Counter()
         async def anonymize(content):
+            if ocr_fail and int(content.decode().split()[-1]) in failures:
+                from app.services.anymize import AnymizeError
+                raise AnymizeError(502, 'sanitized OCR failure')
             return 'Anonymized area 92 m2 doc ' + content.decode().split()[-1]
         async def extract(document):
             index = int(document.text.split()[-1])
@@ -27,7 +30,7 @@ class PartialAnalysisTests(unittest.TestCase):
         app.dependency_overrides[get_property_analysis_service] = lambda: service
         try:
             with TestClient(app) as client:
-                response = client.post('/properties/analyze', files=[('files', (f'{i}.pdf', f'%PDF-1.4 ORIGINAL_PRIVATE {i}'.encode(), 'application/pdf')) for i in range(6)])
+                response = client.post('/properties/analyze', files=[('files', (f'{i}.pdf', f'%PDF-1.4 ORIGINAL_PRIVATE {i}'.encode(), 'application/pdf')) for i in range(count)])
         finally:
             app.dependency_overrides.clear()
         self.assertNotIn('ORIGINAL_PRIVATE', response.text)
@@ -77,3 +80,21 @@ class PartialAnalysisTests(unittest.TestCase):
         response, attempts = self.run_batch(set(range(6)), global_error=True)
         self.assertEqual(response.status_code, 503)
         self.assertEqual(sum(attempts.values()), 1)
+
+    def test_two_documents_extraction_failure_preserves_independent_success(self):
+        response, _ = self.run_batch({1}, count=2)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(sorted(d['processing_status'] for d in data['documents']), ['completed', 'failed'])
+        self.assertEqual([f['fact_id'] for f in data['canonical_facts']], ['fact-0'])
+        self.assertFalse(data['technical_processing_completed'])
+        self.assertEqual(data['processing_status'], 'incomplete')
+        self.assertEqual(data['rule_evaluation_completeness'], 'incomplete')
+        self.assertEqual(data['decision_readiness'], 'NOT_DECISION_READY')
+
+    def test_two_documents_ocr_failure_preserves_success(self):
+        response, _ = self.run_batch({1}, count=2, ocr_fail=True)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual([f['fact_id'] for f in data['canonical_facts']], ['fact-0'])
+        self.assertEqual(sorted(d['processing_status'] for d in data['documents']), ['completed', 'failed'])

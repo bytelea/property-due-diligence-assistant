@@ -107,7 +107,7 @@ class PropertyAnalysisTests(unittest.TestCase):
         self.assertEqual(response.json()["documents"][0]["document_names"], ["a.pdf", "b.pdf"])
         self.anonymizer.anonymize_pdf.assert_awaited_once()
 
-    def test_invalid_file_among_uploads_prevents_all_processing(self):
+    def test_invalid_file_among_uploads_preserves_valid_document(self):
         for filename, content, mime, status in [
             ("bad.txt", b"not pdf", "text/plain", 415),
             ("empty.pdf", b"", "application/pdf", 400),
@@ -119,10 +119,10 @@ class PropertyAnalysisTests(unittest.TestCase):
                     ("files", ("good.pdf", PDFS["listing"], "application/pdf")),
                     ("files", (filename, content, mime)),
                 ])
-                self.assertEqual(response.status_code, status)
-        self.anonymizer.anonymize_pdf.assert_not_awaited()
-        self.extractor.extract.assert_not_awaited()
-        self.engine.analyze.assert_not_called()
+                self.assertEqual(response.status_code, 200)
+                self.assertFalse(response.json()["technical_processing_completed"])
+                self.assertEqual(sorted(d["processing_status"] for d in response.json()["documents"]), ["completed", "failed"])
+        self.assertEqual(self.anonymizer.anonymize_pdf.await_count, 4)
 
     def test_size_count_and_batch_limits(self):
         with patch("app.main.MAX_PDF_BYTES", 5):
@@ -188,10 +188,10 @@ class PropertyAnalysisTests(unittest.TestCase):
             request = SimpleNamespace(form=AsyncMock(return_value=SimpleNamespace(multi_items=lambda: [("files", good), ("files", bad)])))
             service = SimpleNamespace(analyze=AsyncMock())
             from fastapi import HTTPException
-            with self.assertRaises(HTTPException):
-                await analyze_property(request, [good, bad], service)
+            await analyze_property(request, [good, bad], service)
             self.assertTrue(good.file.closed and bad.file.closed)
-            service.analyze.assert_not_awaited()
+            service.analyze.assert_awaited_once()
+            self.assertTrue(any(d.validation_error is not None for d in service.analyze.call_args.args[0]))
 
         asyncio.run(check())
 

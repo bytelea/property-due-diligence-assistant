@@ -87,6 +87,7 @@ class CorsTests(unittest.TestCase):
         self.assertEqual(response.json(), baseline.json())
         self.assertEqual(response.headers['access-control-allow-origin'], ORIGIN)
         invalid = client.post('/properties/analyze', files=[('files', ('bad.pdf', b'bad', 'application/pdf'))], headers={'Origin': ORIGIN})
-        self.assertEqual(invalid.status_code, 415)
+        self.assertEqual(invalid.status_code, 200)  # Mock service; validation is now document-isolated.
+        self.assertEqual(service.analyze.call_args.args[0][0].validation_error.status_code, 415)
         self.assertEqual(invalid.headers['access-control-allow-origin'], ORIGIN)
-        self.assertEqual(service.analyze.await_count, 2)
+        self.assertEqual(service.analyze.await_count, 3)
