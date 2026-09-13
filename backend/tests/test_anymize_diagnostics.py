@@ -237,6 +237,34 @@ class PendingOcrTests(unittest.IsolatedAsyncioTestCase):
         _, output = await self.run_sequence(['pass1_extracting', ' COMPLETED '], expected_error=502)
         self.assertIn('unusable_result', output)
 
+    async def test_second_pass_processing_completed(self):
+        statuses = ['pass2_extracting', 'processing', 'completed']
+        polls, _ = await self.run_sequence(statuses)
+        self.assertEqual(polls, statuses)
+
+    async def test_first_pass_second_pass_completed(self):
+        statuses = ['pass1_extracting', 'pass2_extracting', 'completed']
+        polls, _ = await self.run_sequence(statuses)
+        self.assertEqual(polls, statuses)
+
+    async def test_repeated_second_pass_times_out(self):
+        polls, output = await self.run_sequence([], expected_error=504, repeat_pending=True, repeat_status='pass2_extracting')
+        self.assertGreaterEqual(len(polls), 2)
+        self.assertEqual(set(polls), {'pass2_extracting'})
+        self.assertIn("'category': 'timeout'", output)
+
+    async def test_second_pass_case_and_whitespace_normalization(self):
+        statuses = ['  PASS2_EXTRACTING\t', ' Processing ', ' COMPLETED\n']
+        polls, _ = await self.run_sequence(statuses)
+        self.assertEqual(polls, statuses)
+
+    async def test_second_pass_unknown_status_still_fails(self):
+        for status in ('pass3_extracting', 'unknown', ' FAILED ', 'error', None):
+            with self.subTest(status=status):
+                polls, output = await self.run_sequence(['pass2_extracting', status], expected_error=502)
+                self.assertEqual(polls, ['pass2_extracting', status])
+                self.assertIn('unexpected_job_status', output)
+
 
 class ValidatedStatusDiagnosticTests(unittest.IsolatedAsyncioTestCase):
     async def check_status(self, raw, expected):
