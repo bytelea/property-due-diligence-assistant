@@ -1,4 +1,5 @@
 import re
+from app.services.extraction_diagnostics import emit, validation_failure
 from uuid import NAMESPACE_URL, uuid5
 
 from pydantic import ValidationError
@@ -41,18 +42,25 @@ class PropertyFactExtractionService:
         self, document: AnonymizedDocument, classification: DocumentClassification,
     ) -> list[PropertyFact]:
         raw = await self.model.generate(EXTRACTION_PROMPT, document.text, FactCandidates)
+        emit("model_output_received", structured_json_parsed=False, schema_validated=False)
         try:
             candidates = FactCandidates.model_validate_json(raw)
-        except ValidationError:
+        except ValidationError as error:
+            validation_failure(error)
             raise ExtractionError(502, "Fact extraction returned invalid structured data.") from None
+        emit("structured_json_parse", structured_json_parsed=True)
+        emit("property_fact_schema_validation", schema_validated=True, fact_count=len(candidates.facts))
         facts = []
         seen = set()
         for candidate in candidates.facts:
             if not candidate.evidence.strip() or candidate.evidence not in document.text:
+                emit("evidence_validation", "evidence_validation_failed", False)
                 raise ExtractionError(502, "Fact evidence could not be verified against the anonymized document.")
             if isinstance(candidate.value, str) and candidate.value not in candidate.evidence:
+                emit("evidence_validation", "evidence_validation_failed", False)
                 raise ExtractionError(502, "Reference value could not be verified against its evidence.")
             if isinstance(candidate.value, float) and not number_occurs_in_evidence(candidate.value, candidate.evidence):
+                emit("evidence_validation", "evidence_validation_failed", False)
                 raise ExtractionError(502, "Numeric value could not be verified against its evidence.")
             identity = candidate.model_dump(exclude={"confidence"})
             identity_json = candidate.model_copy(update={"confidence": 0}).model_dump_json()
@@ -60,11 +68,17 @@ class PropertyFactExtractionService:
             if fact_id in seen:
                 continue
             seen.add(fact_id)
-            facts.append(PropertyFact(
+            try:
+                fact = PropertyFact(
                 **identity, confidence=candidate.confidence, fact_id=fact_id,
                 document_id=document.document_id, document_type=classification.document_type,
-                page=None,
-            ))
+                    page=None,
+                )
+            except ValidationError as error:
+                emit("property_fact_schema_validation", "schema_validation_failed", False, schema_validated=False)
+                raise
+            facts.append(fact)
+        emit("evidence_validation", evidence_validated=True, fact_count=len(facts))
         return facts
 
 

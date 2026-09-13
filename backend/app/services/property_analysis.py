@@ -1,4 +1,5 @@
 """All-or-error orchestration over request-scoped PDFs and anonymized facts."""
+from app.services.extraction_diagnostics import begin, end, emit, unexpected_failure
 import hashlib
 import json
 
@@ -30,7 +31,7 @@ class PropertyAnalysisService:
     async def analyze(self, documents: list[PdfDocument]) -> PropertyAssessment:
         combined = []
         processed = []
-        for document in sorted(documents, key=lambda item: item.document_id):
+        for ordinal, document in enumerate(sorted(documents, key=lambda item: item.document_id), start=1):
             try:
                 anonymized = await self.anonymizer.anonymize_pdf(document.content)
             except AnymizeError as error:
@@ -41,22 +42,35 @@ class PropertyAnalysisService:
                 raise PropertyAnalysisError(502, "Document anonymization returned no usable text; no assessment was completed.")
             if len(anonymized) > 100_000:
                 raise PropertyAnalysisError(413, "An anonymized document exceeds the extraction limit of 100,000 characters.")
+            diagnostic_token = begin(ordinal)
+            stage = "model_output_received"
+            category = "unexpected_extraction_error"
             try:
                 extraction = await self.extractor.extract(AnonymizedDocument(document_id=document.document_id, text=anonymized))
+                stage, category = "provenance_validation", "provenance_validation_failed"
                 if extraction.document_id != document.document_id:
                     raise ValueError("Mismatched extraction provenance")
                 facts = []
                 for value in extraction.facts:
+                    stage, category = "property_fact_schema_validation", "schema_validation_failed"
                     fact = PropertyFact.model_validate(value.model_dump())
+                    emit(stage, schema_validated=True)
+                    stage, category = "provenance_validation", "provenance_validation_failed"
                     if (fact.document_id != document.document_id or fact.document_type != extraction.classification.document_type
                         or not fact.evidence.strip() or fact.evidence not in anonymized):
                         raise ValueError("Mismatched fact provenance")
                     facts.append(fact)
+                emit("provenance_validation", provenance_validated=True, fact_count=len(facts))
+                emit("document_extraction_complete", "empty_fact_set" if not facts else None, fact_count=len(facts))
             except ExtractionError as error:
+                unexpected_failure()
                 message = "Property extraction provider is unavailable." if error.status_code == 503 else "Document extraction failed; no assessment was completed."
                 raise PropertyAnalysisError(error.status_code, message) from None
             except Exception:
+                emit(stage, category, False)
                 raise PropertyAnalysisError(502, "Document extraction failed; no assessment was completed.") from None
+            finally:
+                end(diagnostic_token)
             combined.extend(facts)
             processed.append(ProcessedDocument(
                 document_id=document.document_id, document_name=document.names[0], document_names=document.names,
