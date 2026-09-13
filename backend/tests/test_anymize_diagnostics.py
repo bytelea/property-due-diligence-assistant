@@ -132,3 +132,74 @@ class OcrJobIdRegressionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn('invalid_job_id', str(logs.output))
                 self.assertNotIn('synthetic-test-key', str(logs.output))
                 self.assertTrue(all(r.exc_info is None for r in logs.records))
+
+
+class PendingOcrTests(unittest.IsolatedAsyncioTestCase):
+    async def run_sequence(self, statuses, expected_error=None, repeat_pending=False):
+        calls = []
+        polls = []
+        secret = 'synthetic-pending-secret'
+        job_id = 'synthetic_pending_job'
+        def handle(request):
+            calls.append(request.method)
+            if request.method == 'POST':
+                return httpx.Response(202, json={'job_id': job_id})
+            status = 'pending' if repeat_pending else statuses[len(polls)]
+            polls.append(status)
+            payload = {'status': status, 'job_id': job_id,
+                       'original_text': 'PRIVATE_SENTINEL', 'metadata': 'PAYLOAD_SENTINEL'}
+            if status == 'completed' and expected_error is None:
+                payload['anonymized_text_raw'] = 'ANONYMIZED_SENTINEL'
+            return httpx.Response(200, json=payload)
+        service = AnymizeService(httpx.MockTransport(handle))
+        service.POLL_INTERVAL = 0.001 if repeat_pending else 0
+        if repeat_pending:
+            service.PROCESSING_TIMEOUT = 0.05
+        with patch('app.services.anymize.get_settings', return_value=Settings(_env_file=None, anymize_api_key=secret)):
+            with self.assertLogs('app.services.anymize', level='INFO') as logs:
+                if expected_error:
+                    with self.assertRaises(AnymizeError) as error:
+                        await service.anonymize_pdf(b'%PDF-PRIVATE_SENTINEL')
+                    self.assertEqual(error.exception.status_code, expected_error)
+                    public_error = str(error.exception)
+                    self.assertTrue(error.exception.__suppress_context__ if expected_error == 504 else True)
+                else:
+                    result = await service.anonymize_pdf(b'%PDF-PRIVATE_SENTINEL')
+                    self.assertEqual(result, 'ANONYMIZED_SENTINEL')
+                    public_error = ''
+        output = '\n'.join(logs.output) + public_error
+        for forbidden in (secret, job_id, 'PRIVATE_SENTINEL', 'ANONYMIZED_SENTINEL', 'PAYLOAD_SENTINEL', 'authorization'):
+            self.assertNotIn(forbidden, output)
+        self.assertTrue(all(r.exc_info is None for r in logs.records))
+        self.assertEqual(calls[0], 'POST')
+        self.assertTrue(all(method == 'GET' for method in calls[1:]))
+        return polls, output
+
+    async def test_pending_processing_completed(self):
+        statuses = ['pending', 'processing', 'completed']
+        polls, output = await self.run_sequence(statuses)
+        self.assertEqual(polls, statuses)
+        self.assertIn("'job_status': 'pending'", output)
+
+    async def test_pending_completed(self):
+        statuses = ['pending', 'completed']
+        polls, _ = await self.run_sequence(statuses)
+        self.assertEqual(polls, statuses)
+
+    async def test_repeated_pending_reaches_existing_deadline(self):
+        polls, output = await self.run_sequence([], expected_error=504, repeat_pending=True)
+        self.assertGreaterEqual(len(polls), 2)
+        self.assertEqual(set(polls), {'pending'})
+        self.assertIn("'category': 'timeout'", output)
+
+    async def test_pending_then_unknown_or_failed_still_fails(self):
+        for status in ('PRIVATE_SENTINEL', 'failed', 'error', 'queued', None):
+            with self.subTest(status=status):
+                polls, output = await self.run_sequence(['pending', status], expected_error=502)
+                self.assertEqual(polls, ['pending', status])
+                self.assertIn('unexpected_job_status', output)
+
+    async def test_pending_completed_without_expected_text_fails(self):
+        polls, output = await self.run_sequence(['pending', 'completed'], expected_error=502)
+        self.assertEqual(polls, ['pending', 'completed'])
+        self.assertIn('unusable_result', output)

@@ -91,7 +91,7 @@ class AnymizeService:
                             log_diagnostic(diagnostic, failed=False)
                             return text
                         diagnostic["category"] = "unexpected_job_status"
-                        if status != "processing":
+                        if status not in ("pending", "processing"):
                             raise AnymizeError(502, "Document processing did not complete successfully.")
                         diagnostic["category"] = "processing"
                         log_diagnostic(diagnostic, failed=False)
