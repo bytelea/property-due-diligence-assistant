@@ -77,14 +77,14 @@ class AnymizeService:
                         diagnostic = {"stage": "ocr_poll", "http_status": None, "category": "transport_error"}
                         payload = self._payload(await client.get(f"status/{job_id}"), diagnostic)
                         status = payload.get("status")
-                        # Normalize only diagnostic metadata; polling still compares raw status.
+                        # Normalize provider control metadata before comparisons and safe logging.
                         normalized_status = status.strip().lower() if isinstance(status, str) else ""
                         diagnostic["job_status"] = normalized_status if (
                             re.fullmatch(r"[a-z0-9_-]{1,32}", normalized_status)
                             and api_key.lower() not in normalized_status
                             and job_id.lower() not in normalized_status
                         ) else "unrecognized"
-                        if status == "completed":
+                        if normalized_status == "completed":
                             diagnostic["stage"] = "ocr_result"
                             diagnostic["category"] = "unusable_result"
                             text = payload.get("anonymized_text_raw")
@@ -94,7 +94,7 @@ class AnymizeService:
                             log_diagnostic(diagnostic, failed=False)
                             return text
                         diagnostic["category"] = "unexpected_job_status"
-                        if status not in ("pending", "processing"):
+                        if normalized_status not in ("pending", "processing", "pass1_extracting"):
                             raise AnymizeError(502, "Document processing did not complete successfully.")
                         diagnostic["category"] = "processing"
                         log_diagnostic(diagnostic, failed=False)

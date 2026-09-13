@@ -135,7 +135,7 @@ class OcrJobIdRegressionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class PendingOcrTests(unittest.IsolatedAsyncioTestCase):
-    async def run_sequence(self, statuses, expected_error=None, repeat_pending=False):
+    async def run_sequence(self, statuses, expected_error=None, repeat_pending=False, repeat_status="pending"):
         calls = []
         polls = []
         secret = 'synthetic-pending-secret'
@@ -144,11 +144,11 @@ class PendingOcrTests(unittest.IsolatedAsyncioTestCase):
             calls.append(request.method)
             if request.method == 'POST':
                 return httpx.Response(202, json={'job_id': job_id})
-            status = 'pending' if repeat_pending else statuses[len(polls)]
+            status = repeat_status if repeat_pending else statuses[len(polls)]
             polls.append(status)
             payload = {'status': status, 'job_id': job_id,
                        'original_text': 'PRIVATE_SENTINEL', 'metadata': 'PAYLOAD_SENTINEL'}
-            if status == 'completed' and expected_error is None:
+            if isinstance(status, str) and status.strip().lower() == 'completed' and expected_error is None:
                 payload['anonymized_text_raw'] = 'ANONYMIZED_SENTINEL'
             return httpx.Response(200, json=payload)
         service = AnymizeService(httpx.MockTransport(handle))
@@ -205,6 +205,39 @@ class PendingOcrTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('unusable_result', output)
 
 
+    async def test_extracting_processing_completed(self):
+        statuses = ['pass1_extracting', 'processing', 'completed']
+        polls, _ = await self.run_sequence(statuses)
+        self.assertEqual(polls, statuses)
+
+    async def test_extracting_completed(self):
+        statuses = ['pass1_extracting', 'completed']
+        polls, _ = await self.run_sequence(statuses)
+        self.assertEqual(polls, statuses)
+
+    async def test_repeated_extracting_times_out(self):
+        polls, output = await self.run_sequence([], expected_error=504, repeat_pending=True, repeat_status='pass1_extracting')
+        self.assertGreaterEqual(len(polls), 2)
+        self.assertEqual(set(polls), {'pass1_extracting'})
+        self.assertIn("'category': 'timeout'", output)
+
+    async def test_case_and_whitespace_normalize_all_recognized_states(self):
+        statuses = [' PENDING ', '\tPASS1_EXTRACTING\n', ' Processing ', ' COMPLETED\r\n']
+        polls, _ = await self.run_sequence(statuses)
+        self.assertEqual(polls, statuses)
+
+    async def test_extracting_then_unknown_or_failure_still_fails(self):
+        for status in (' NEW_STATE ', ' FAILED ', ' ERROR ', None, 123, {}, []):
+            with self.subTest(status=status):
+                polls, output = await self.run_sequence(['pass1_extracting', status], expected_error=502)
+                self.assertEqual(polls, ['pass1_extracting', status])
+                self.assertIn('unexpected_job_status', output)
+
+    async def test_normalized_completed_still_requires_expected_text(self):
+        _, output = await self.run_sequence(['pass1_extracting', ' COMPLETED '], expected_error=502)
+        self.assertIn('unusable_result', output)
+
+
 class ValidatedStatusDiagnosticTests(unittest.IsolatedAsyncioTestCase):
     async def check_status(self, raw, expected):
         calls = []
@@ -238,6 +271,6 @@ class ValidatedStatusDiagnosticTests(unittest.IsolatedAsyncioTestCase):
         for raw in ('synthetic-secret-key', 'SYNTHETIC-JOB-ID'):
             await self.check_status(raw, 'unrecognized')
 
-    async def test_normalized_logging_does_not_change_polling_semantics(self):
-        for raw in (' Pending ', 'PROCESSING', ' Completed '):
+    async def test_normalized_unknown_states_still_fail(self):
+        for raw in (' UNKNOWN ', 'FAILED', ' Error '):
             await self.check_status(raw, raw.strip().lower())
