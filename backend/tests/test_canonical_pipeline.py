@@ -164,7 +164,7 @@ class ProductionCanonicalTests(unittest.TestCase):
         with patch('app.services.property_analysis.normalize_facts', wraps=normalize_facts) as normalize:
             result = self.upload()
         self.assertEqual(result.status_code, 200)
-        normalize.assert_called_once()
+        self.assertEqual(normalize.call_count, 2)
         self.assertTrue(all(isinstance(f, CanonicalPropertyFact) for f in self.engine.analyze.call_args.args[0]))
         self.assertTrue(all(f.scope == "UNIT" for f in self.engine.analyze.call_args.args[0]))
         data = result.json()
@@ -178,7 +178,7 @@ class ProductionCanonicalTests(unittest.TestCase):
             response = self.upload()
         self.assertEqual(response.status_code, 502)
         self.assertNotIn('SYNTHETIC_PRIVATE_MARKER', response.text)
-        self.assertIn('normalization failed', response.text)
+        self.assertIn('Document extraction failed', response.text)
         self.engine.analyze.assert_not_called()
 
     def test_full_production_trace_and_existing_fields(self):

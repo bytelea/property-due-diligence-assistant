@@ -29,9 +29,10 @@ def log_diagnostic(context: dict, *, failed: bool = True) -> None:
 class AnymizeError(Exception):
     """An error containing only a fixed, client-safe message."""
 
-    def __init__(self, status_code: int, message: str):
+    def __init__(self, status_code: int, message: str, *, global_failure: bool = False):
         super().__init__(message)
         self.status_code = status_code
+        self.global_failure = global_failure
 
 
 class AnymizeService:
@@ -119,7 +120,7 @@ class AnymizeService:
         diagnostic["http_status"] = response.status_code
         diagnostic["category"] = "http_rejected"
         if response.status_code not in (200, 202):
-            raise AnymizeError(502, "Document processor rejected the request.")
+            raise AnymizeError(502, "Document processor rejected the request.", global_failure=response.status_code in (401, 403))
         diagnostic["category"] = "invalid_json"
         try:
             payload = response.json()

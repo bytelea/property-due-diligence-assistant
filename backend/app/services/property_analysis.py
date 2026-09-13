@@ -1,4 +1,4 @@
-"""All-or-error orchestration over request-scoped PDFs and anonymized facts."""
+"""Document-isolated processing over request-scoped PDFs and anonymized facts."""
 from app.services.extraction_diagnostics import begin, end, emit, unexpected_failure
 import hashlib
 import json
@@ -31,73 +31,94 @@ class PropertyAnalysisService:
     async def analyze(self, documents: list[PdfDocument]) -> PropertyAssessment:
         combined = []
         processed = []
+        last_error = PropertyAnalysisError(502, "Document extraction failed; no assessment was completed.")
         for ordinal, document in enumerate(sorted(documents, key=lambda item: item.document_id), start=1):
+            failed = ProcessedDocument(document_id=document.document_id, document_name=document.names[0],
+                document_names=document.names, document_type="OTHER", fact_ids=[], processing_status="failed")
             try:
                 anonymized = await self.anonymizer.anonymize_pdf(document.content)
             except AnymizeError as error:
-                raise PropertyAnalysisError(error.status_code, "Document anonymization failed; no assessment was completed.") from None
+                if error.status_code in (401, 403, 503) or error.global_failure:
+                    raise PropertyAnalysisError(error.status_code, "Document anonymization failed; no assessment was completed.") from None
+                last_error = PropertyAnalysisError(error.status_code, "Document anonymization failed; no assessment was completed.")
+                processed.append(failed)
+                continue
             except Exception:
-                raise PropertyAnalysisError(502, "Document anonymization failed; no assessment was completed.") from None
-            if not isinstance(anonymized, str) or not anonymized.strip():
-                raise PropertyAnalysisError(502, "Document anonymization returned no usable text; no assessment was completed.")
-            if len(anonymized) > 100_000:
-                raise PropertyAnalysisError(413, "An anonymized document exceeds the extraction limit of 100,000 characters.")
-            diagnostic_token = begin(ordinal)
-            stage = "model_output_received"
-            category = "unexpected_extraction_error"
-            try:
-                extraction = await self.extractor.extract(AnonymizedDocument(document_id=document.document_id, text=anonymized))
-                stage, category = "provenance_validation", "provenance_validation_failed"
-                if extraction.document_id != document.document_id:
-                    raise ValueError("Mismatched extraction provenance")
-                facts = []
-                for value in extraction.facts:
-                    stage, category = "property_fact_schema_validation", "schema_validation_failed"
-                    fact = PropertyFact.model_validate(value.model_dump())
-                    emit(stage, schema_validated=True)
+                last_error = PropertyAnalysisError(502, "Document anonymization failed; no assessment was completed.")
+                processed.append(failed)
+                continue
+            if not isinstance(anonymized, str) or not anonymized.strip() or len(anonymized) > 100_000:
+                last_error = PropertyAnalysisError(502, "Document anonymization returned no usable text; no assessment was completed.")
+                processed.append(failed)
+                continue
+            for attempt in range(2):
+                diagnostic_token = begin(ordinal)
+                stage, category = "model_output_received", "unexpected_extraction_error"
+                try:
+                    extraction = await self.extractor.extract(AnonymizedDocument(document_id=document.document_id, text=anonymized))
                     stage, category = "provenance_validation", "provenance_validation_failed"
-                    if (fact.document_id != document.document_id or fact.document_type != extraction.classification.document_type
-                        or not fact.evidence.strip() or fact.evidence not in anonymized):
-                        raise ValueError("Mismatched fact provenance")
-                    facts.append(fact)
-                emit("provenance_validation", provenance_validated=True, fact_count=len(facts))
-                emit("document_extraction_complete", "empty_fact_set" if not facts else None, fact_count=len(facts))
-            except ExtractionError as error:
-                unexpected_failure()
-                message = "Property extraction provider is unavailable." if error.status_code == 503 else "Document extraction failed; no assessment was completed."
-                raise PropertyAnalysisError(error.status_code, message) from None
-            except Exception:
-                emit(stage, category, False)
-                raise PropertyAnalysisError(502, "Document extraction failed; no assessment was completed.") from None
-            finally:
-                end(diagnostic_token)
-            combined.extend(facts)
-            processed.append(ProcessedDocument(
-                document_id=document.document_id, document_name=document.names[0], document_names=document.names,
-                document_type=extraction.classification.document_type, fact_ids=sorted(f.fact_id for f in facts),
-            ))
-        try:
-            canonical = normalize_facts(combined)
-        except Exception:
-            raise PropertyAnalysisError(502, "Document normalization failed; no assessment was completed.") from None
+                    if extraction.document_id != document.document_id:
+                        raise ValueError("Mismatched extraction provenance")
+                    facts = []
+                    for value in extraction.facts:
+                        stage, category = "property_fact_schema_validation", "schema_validation_failed"
+                        fact = PropertyFact.model_validate(value.model_dump())
+                        stage, category = "provenance_validation", "provenance_validation_failed"
+                        if (fact.document_id != document.document_id or fact.document_type != extraction.classification.document_type
+                            or not fact.evidence.strip() or fact.evidence not in anonymized):
+                            raise ValueError("Mismatched fact provenance")
+                        facts.append(fact)
+                    canonical_document = normalize_facts(facts)
+                    emit("provenance_validation", provenance_validated=True, fact_count=len(facts))
+                    emit("document_extraction_complete", "empty_fact_set" if not facts else None, fact_count=len(facts))
+                except ExtractionError as error:
+                    if error.status_code in (401, 403, 503) and not getattr(error, "retryable", False):
+                        raise PropertyAnalysisError(error.status_code, "Property extraction provider is unavailable.") from None
+                    unexpected_failure()
+                    last_error = PropertyAnalysisError(error.status_code, "Document extraction failed; no assessment was completed.")
+                except Exception:
+                    emit(stage, category, False)
+                    last_error = PropertyAnalysisError(502, "Document extraction failed; no assessment was completed.")
+                else:
+                    combined.extend(canonical_document)
+                    processed.append(ProcessedDocument(
+                        document_id=document.document_id, document_name=document.names[0], document_names=document.names,
+                        document_type=extraction.classification.document_type, fact_ids=sorted(f.fact_id for f in canonical_document)))
+                    break
+                finally:
+                    end(diagnostic_token)
+            else:
+                processed.append(failed)
+        successful = [d for d in processed if d.processing_status == "completed"]
+        if not successful:
+            raise last_error from None
+        canonical = combined
         try:
             assessment = self.engine.analyze(canonical)
         except Exception:
             raise PropertyAnalysisError(502, "Combined property analysis failed; no assessment was completed.") from None
         assessment.documents = processed
-        names = {document.document_id: document.document_name for document in processed}
+        names = {document.document_id: document.document_name for document in successful}
         for finding in assessment.findings:
             for evidence in finding.evidence:
                 if evidence.document_id not in names:
                     raise PropertyAnalysisError(502, "Combined analysis returned invalid source provenance.")
                 evidence.document_name = names[evidence.document_id]
         # Include documents producing zero facts in provenance and batch identity.
-        assessment.run_metadata["input_document_ids"] = sorted(names)
-        assessment.run_metadata["processed_document_count"] = len(processed)
+        assessment.run_metadata["input_document_ids"] = sorted(d.document_id for d in processed)
+        assessment.run_metadata["processed_document_count"] = len(successful)
         assessment.run_metadata["processing_stages_completed"] = True
         assessment.technical_processing_completed = True
         assessment.processing_status = "incomplete" if assessment.decision_readiness == "NOT_DECISION_READY" else "completed"
-        fingerprint = json.dumps({"engine_assessment_id": assessment.id, "document_ids": sorted(names)}, sort_keys=True)
+        if len(successful) != len(processed):
+            assessment.technical_processing_completed = False
+            assessment.processing_status = "incomplete"
+            assessment.decision_readiness = "NOT_DECISION_READY"
+            assessment.rule_evaluation_completeness = "incomplete"
+            assessment.run_metadata["processing_stages_completed"] = False
+            assessment.run_metadata["failed_document_count"] = len(processed) - len(successful)
+            assessment.uncertainties.append("One or more supplied documents could not be fully analyzed. Findings are based only on successfully processed documents.")
+        fingerprint = json.dumps({"engine_assessment_id": assessment.id, "document_ids": [(d.document_id, d.processing_status) for d in processed]}, sort_keys=True)
         assessment.id = "assessment-" + hashlib.sha256(fingerprint.encode()).hexdigest()[:24]
         return assessment
 

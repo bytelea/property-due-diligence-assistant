@@ -141,13 +141,13 @@ class PropertyAnalysisTests(unittest.TestCase):
             ])
             self.assertEqual(response.status_code, 400)
 
-    def test_anonymization_failure_does_not_analyze_partial_facts(self):
+    def test_anonymization_failure_preserves_successful_documents(self):
         self.anonymizer.anonymize_pdf.side_effect = [TEXTS["listing"], AnymizeError(502, "SYNTHETIC_PRIVATE_ERROR")]
         response = self.upload()
-        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.status_code, 200)
         self.assertNotIn("SYNTHETIC_PRIVATE_ERROR", response.text)
-        self.engine.analyze.assert_not_called()
-        self.assertNotIn("findings", response.json())
+        self.engine.analyze.assert_called_once()
+        self.assertFalse(response.json()["technical_processing_completed"])
 
     def test_extraction_failure_does_not_analyze_partial_facts(self):
         self.extractor.extract.side_effect = ExtractionError(503, "SYNTHETIC_PRIVATE_ERROR")

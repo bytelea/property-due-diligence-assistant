@@ -11,4 +11,4 @@ class ProcessedDocument(BaseModel):
     document_names: list[str]
     document_type: DocumentType
     fact_ids: list[str] = Field(default_factory=list)
-    processing_status: Literal["completed"] = "completed"
+    processing_status: Literal["completed", "failed"] = "completed"

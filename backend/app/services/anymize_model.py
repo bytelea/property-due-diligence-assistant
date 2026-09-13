@@ -135,7 +135,7 @@ class AnymizeStructuredModel:
                 raise ExtractionError(503, "Property extraction provider is unavailable.")
             if response.status_code in (404, 429) or response.status_code >= 500:
                 diagnostic["category"] = {404: "model_not_found", 429: "rate_limited"}.get(response.status_code, "provider_5xx")
-                raise ExtractionError(503, "Property extraction provider is unavailable.")
+                raise ExtractionError(503, "Property extraction provider is unavailable.", retryable=response.status_code == 429 or response.status_code >= 500)
             if response.status_code != 200:
                 diagnostic["category"] = "http_rejected"
                 raise ExtractionError(502, "Property extraction provider request failed.")
