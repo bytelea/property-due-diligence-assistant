@@ -1,143 +1,121 @@
+<div align="center">
+
 # Property Scan
 
-> **A clearer view of what matters.**
+### A clearer view of what matters.
 
 **More than documents. Real answers.**
 
-Property Scan is an AI-supported property due diligence web app for residential buyers. It analyzes multiple property documents together, surfaces contradictions, missing evidence and financial risks, and turns them into evidence-backed findings and concrete next steps.
+AI-supported property due diligence for residential buyers — built during the **AI.WOMEN Hackathon 2026**.
 
-Built during the **AI.WOMEN Hackathon 2026**.
+**Trust · Evidence · Clarity**
 
-**Trust / Evidence / Clarity**
+[Live App](https://propertyscan.lovable.app/) · [API](https://property-due-diligence-api-267668658542.europe-west1.run.app) · [API Docs](https://property-due-diligence-api-267668658542.europe-west1.run.app/docs)
 
----
-
-## Live Demo
-
-**Frontend:**  
-https://propertyscan.lovable.app
-
-**Backend API:**  
-https://property-due-diligence-api-267668658542.europe-west1.run.app
-
-**Interactive API Docs:**  
-https://property-due-diligence-api-267668658542.europe-west1.run.app/docs
+</div>
 
 ---
 
-## The Problem
+## Why Property Scan?
 
-Buying a property often means reviewing a large package of documents:
+Buying a home should feel exciting. Instead, buyers often receive a pile of documents written for professionals — and are expected to know what matters.
 
-- property listings
-- floor plans
-- homeowners' association minutes
-- annual statements
-- economic plans
-- land-register extracts
-- energy certificates
-- rental agreements
-- tax documents
-- planning and compliance documents
+A floor plan. A land-register extract. Homeowners' association minutes. Financial statements. Energy documents. Planned maintenance.
 
-For a non-expert buyer, the difficult part is not simply reading them.
+The difficult part is not finding the information. **It is connecting it.**
 
-The real questions are:
+Property Scan helps answer questions such as:
 
-- Do the documents contradict each other?
-- Are there hidden or upcoming costs?
+- Does the apartment size match across documents?
+- Are expensive works mentioned somewhere else in the file set?
+- Is a building-level project cost being mistaken for the buyer's own liability?
 - Is important evidence missing?
-- What should I clarify before signing?
+- What should the buyer clarify before signing?
 
-Most tools summarize documents one by one.
-
-**Property Scan cross-checks them as one property.**
+> **AI extracts the facts. Our rule engine cross-examines them across documents.**
 
 ---
 
-## What We Built
+## Product Walkthrough
 
-```text
-Property PDFs
-    ↓
-Anymize — OCR + anonymization
-    ↓
-AI — structured fact extraction
-    ↓
-Canonical normalization
-    ↓
-Deterministic rule engine
-    ↓
-Property Assessment
-    ↓
-Summary → Detailed Evaluation → Action List
-````
+### 1. Add a property
 
-Property Scan is designed to keep every important finding connected to its source evidence.
+Start with only the basic property identity. Everything else should come from the documents.
 
-The goal is not simply to summarize documents.
+![Add a property](docs/screenshots/01-add-property.png)
 
-The goal is to answer:
+### 2. Upload the document package
 
-> **What could I regret after signing?**
+Upload multiple PDFs such as the Exposé, land-register extract, homeowners' association minutes, economic plan, annual statement, floor plan and energy certificate.
 
----
+Property Scan treats them as **one property package**, not as isolated files.
 
-## Example Findings
+![Documents](docs/screenshots/02-documents.png)
 
-### Floor-area conflict
+### 3. See what matters first
 
-**Listing:** 105 m²
-**Floor plan:** 92 m²
+The Summary gives the buyer a fast view of confirmed issues, unresolved questions and evidence-backed findings.
 
-Property Scan identifies the discrepancy only when the measurements are actually comparable and keeps both sources visible.
+![Summary](docs/screenshots/03-summary.png)
 
-**Buyer action:** Ask which floor-area figure is legally recognised and request supporting documentation.
+### 4. Investigate a finding
 
----
+Findings are grouped into buyer-relevant themes and can be opened for deeper analysis.
 
-### Upcoming contribution
+![Analysis](docs/screenshots/04-analysis.png)
 
-**€6,500** documented as an upcoming unit-level contribution.
+### 5. Trace a finding back to evidence
 
-Property Scan distinguishes a unit amount from a building-wide project total and avoids assuming who must pay when responsibility is unresolved.
+Important findings stay connected to their underlying document and source passage.
 
-**Buyer action:** Clarify the payment amount, due date and whether the seller or buyer is responsible.
+![Evidence](docs/screenshots/05-evidence.png)
+
+### 6. Turn findings into action
+
+Property Scan translates unresolved findings into concrete questions and next steps before signing.
+
+![Next steps](docs/screenshots/06-next-steps.png)
 
 ---
 
-### Missing planning evidence
+## How It Works
 
-An alteration is referenced, but supporting planning or compliance evidence is missing.
+```mermaid
+flowchart TD
+    A[Uploaded property PDFs] --> B[Anymize OCR + anonymization]
+    B --> C[AI structured fact extraction]
+    C --> D[Evidence + provenance validation]
+    D --> E[Canonical fact normalization]
+    E --> F[Deterministic cross-document rule engine]
+    F --> G[PropertyAssessment]
+    G --> H[Summary]
+    G --> I[Analysis]
+    G --> J[Evidence]
+    G --> K[Next steps]
+```
 
-Property Scan reports **evidence missing / needs verification** rather than claiming the alteration is illegal.
-
-**Buyer action:** Request the relevant planning or compliance documents before proceeding.
+The live MVP follows a request-processing architecture. Uploaded PDFs and extracted facts are processed through the analysis pipeline, but **no separate persistent document or structured-facts database is part of the current MVP**.
 
 ---
 
-## How AI Is Used
+## What AI Does — and What It Does Not Do
 
-AI is used where understanding unstructured property documents is necessary:
+AI is used for the parts that require understanding unstructured documents:
 
-* document classification
-* structured fact extraction
-* German-language property-document understanding
-* evidence capture from anonymized text
+- document classification
+- German-language property-document understanding
+- structured fact extraction
+- source-evidence extraction from anonymized text
 
-The AI does **not** make the final due-diligence decision on its own.
+AI does **not** make the final due-diligence decision on its own.
 
-> **AI reads the documents. Our rule engine cross-examines the facts.**
-
-After extraction, the backend normalizes the information and applies deterministic property rules.
-
-This makes the system easier to test, explain and improve.
+After extraction, Property Scan validates evidence, normalizes facts into a canonical model and applies deterministic rules across documents. This separation makes the system easier to test, explain and improve.
 
 ---
 
 ## Evidence-First Analysis
 
-A material finding can be traced through:
+A material finding can be traced through the system:
 
 ```text
 PropertyAssessment
@@ -153,192 +131,120 @@ Source document / page / evidence
 
 The backend deliberately preserves distinctions such as:
 
-* living area ≠ tax area
-* project total ≠ unit liability
-* planned expenditure ≠ historical actual expenditure
-* missing evidence ≠ non-compliance
-* works completed ≠ contribution paid
+- living area ≠ tax area
+- project total ≠ unit liability
+- planned expenditure ≠ historical actual expenditure
+- missing evidence ≠ non-compliance
+- works completed ≠ contribution paid
 
 Unknown information stays unknown rather than being guessed.
 
 ---
 
+## Example Findings
+
+### Floor-area discrepancy
+
+If two comparable documents contain different floor-area values, Property Scan keeps both sources visible and surfaces the inconsistency rather than silently choosing one.
+
+**Buyer action:** Ask which floor-area figure is legally recognised and request supporting documentation.
+
+### Planned works / financial exposure
+
+Property Scan can identify planned or commissioned works across homeowners' association minutes and economic plans while distinguishing **whole-building project costs** from a confirmed **unit-specific buyer obligation**.
+
+If buyer liability is not supported by the supplied evidence, the system reports **Needs verification** rather than presenting the building cost as the buyer's personal cost.
+
+**Buyer action:** Request the unit-specific allocation, outstanding balance, payment schedule and confirmation of who is responsible for payment.
+
+### Missing planning or legal evidence
+
+When an alteration or extension is referenced without sufficient supporting planning evidence, Property Scan surfaces the missing evidence without claiming non-compliance that cannot be proven.
+
+**Buyer action:** Request the relevant planning or compliance documents before proceeding.
+
+---
+
 ## Product Experience
 
-Property Scan focuses on three core screens.
-
-### 1. Summary / Assessment
-
-A quick view of:
-
-* Critical
-* Attention
-* Positive
-* Verify
-
-plus the most important financial implications.
-
-The goal is to help the buyer understand the property in the first few seconds.
+| Screen | Purpose |
+| --- | --- |
+| **Documents** | Upload and classify the property document package |
+| **Review** | Confirm what was provided and what is still missing |
+| **Summary** | Understand the most important findings quickly |
+| **Analysis** | Explore findings by topic and severity |
+| **Evidence** | Trace findings back to the underlying source passages |
+| **Next steps** | Turn unresolved findings into concrete buyer actions |
 
 ---
 
-### 2. Detailed Evaluation
+## Technical Architecture
 
-Findings are grouped into themes such as:
-
-* Property details
-* Finances & homeowners' association
-* Building & condition
-* Energy
-* Legal & ownership
-* Tenancy
-* Documents & completeness
-
-Users can drill into:
-
-* evidence
-* conflicting values
-* financial impact
-* why a finding matters
-* recommended next steps
-
----
-
-### 3. Action List
-
-Findings become concrete next steps.
-
-Examples include:
-
-* ask the seller or agent
-* request missing documents
-* clarify payment responsibility
-* ask homeowners' association management
-* verify information with a notary
-* obtain a surveyor's assessment
-
-The frontend can also track which actions have already been completed.
-
----
-
-## Architecture
-
-```text
-┌──────────────────────────────────┐
-│         Lovable Frontend         │
-│                                  │
-│ Upload                           │
-│ Summary                          │
-│ Detailed Evaluation              │
-│ Action List                      │
-└────────────────┬─────────────────┘
-                 │
-                 │ HTTPS
-                 ▼
-┌──────────────────────────────────┐
-│        Google Cloud Run          │
-│          FastAPI API             │
-└────────────────┬─────────────────┘
-                 │
-                 ▼
-┌──────────────────────────────────┐
-│             Anymize              │
-│                                  │
-│ OCR                              │
-│ Anonymization                    │
-└────────────────┬─────────────────┘
-                 │
-                 ▼
-┌──────────────────────────────────┐
-│     Structured AI Extraction     │
-│                                  │
-│ anonymized text                  │
-│ → PropertyFact[]                 │
-└────────────────┬─────────────────┘
-                 │
-                 ▼
-┌──────────────────────────────────┐
-│      Canonical Normalization     │
-│                                  │
-│ scope                            │
-│ measurement type                 │
-│ financial semantics              │
-│ dates / status                   │
-│ provenance                       │
-└────────────────┬─────────────────┘
-                 │
-                 ▼
-┌──────────────────────────────────┐
-│    Deterministic Rule Engine     │
-│                                  │
-│ RuleEvaluation[]                 │
-│ conflicts                        │
-│ missing evidence                 │
-│ financial exposure               │
-└────────────────┬─────────────────┘
-                 │
-                 ▼
-┌──────────────────────────────────┐
-│        PropertyAssessment        │
-│                                  │
-│ findings                         │
-│ evidence                         │
-│ financial impact                 │
-│ buyer actions                    │
-└──────────────────────────────────┘
+```mermaid
+flowchart LR
+    A[Lovable / React / TypeScript] -->|HTTPS| B[FastAPI on Cloud Run]
+    B --> C[Anymize OCR + anonymization]
+    C --> D[LLM structured extraction]
+    D --> E[Evidence validation]
+    E --> F[Canonical normalization]
+    F --> G[Deterministic rule engine]
+    G --> H[PropertyAssessment JSON]
+    H --> A
 ```
 
+### Tools & Stack
+
+| Layer | Technology |
+| --- | --- |
+| Buyer-facing frontend | **Lovable, React, TypeScript** |
+| Backend API | **Python, FastAPI, Pydantic** |
+| OCR + privacy | **Anymize AI** |
+| Structured extraction | **LLM access routed through Anymize in the live MVP** |
+| Cloud hosting | **Google Cloud Run** |
+| CI/CD | **GitHub → Google Cloud Build → Cloud Run** |
+| Secrets | **Google Cloud Secret Manager** |
+| Model-provider exploration | **Google Cloud / Vertex AI integration explored during development** |
+| Development support | **OpenAI Codex** |
+| Version control | **GitHub** |
+
 ---
 
-## Canonical Property Facts
+## Privacy & Security
 
-Before rules are applied, extracted facts are normalized into a canonical property model.
+Property documents can contain sensitive personal information, so privacy is part of the architecture rather than an afterthought.
 
-This prevents different concepts from being compared incorrectly.
+The MVP is designed so that:
 
-For example:
+- documents are anonymized before downstream AI extraction
+- API secrets are stored in Google Cloud Secret Manager
+- real API keys are not committed to GitHub
+- downstream rule evaluation works on anonymized structured facts
+- provider errors are sanitized before being returned to users
+- missing information is not silently inferred
+- uploaded documents are **not persisted in a separate document database** in the hackathon MVP
 
-```text
-Living area
-≠
-Tax area
+---
 
-Project total
-≠
-Unit liability
+## Resilient Multi-Document Processing
 
-Planned expenditure
-≠
-Historical actual expenditure
+Property Scan processes documents independently so that one difficult file does not destroy the whole property assessment.
 
-Missing evidence
-≠
-Non-compliance
-```
+If one document cannot be processed safely:
 
-The normalization layer preserves important semantics such as:
+1. the document is retried once
+2. if it still fails, it is marked **Needs review**
+3. successfully validated documents remain available
+4. rules run only on successfully validated canonical facts
+5. the assessment is explicitly marked incomplete
+6. purchase readiness remains `NOT_DECISION_READY`
 
-* measurement type
-* scope
-* entity identity
-* financial amount type
-* payer or liability party
-* recurring versus one-time amounts
-* planned versus actual status
-* document dates
-* factual periods
-* source authority
-* evidence provenance
-
-Unknown values remain unknown rather than being filled with assumptions.
+This is intentional: partial, transparent evidence is safer than silently fabricating missing facts or discarding a successful analysis of the remaining documents.
 
 ---
 
 ## Deterministic Rule Engine
 
-The due-diligence engine is based on a structured Rulebook developed by the team.
-
-The rule architecture follows:
+The due-diligence engine is driven by a structured Rulebook developed by the team.
 
 ```text
 Inputs
@@ -356,7 +262,7 @@ Evidence
 Buyer action
 ```
 
-The backend distinguishes between different evaluation states:
+The engine distinguishes between states such as:
 
 ```text
 NOT_APPLICABLE
@@ -365,242 +271,109 @@ EVALUATED_PASS
 TRIGGERED
 ```
 
-This matters because:
+That distinction matters because:
 
-> **"We do not have enough information" is not the same as "we checked this and everything is fine."**
-
-Technical processing success is also kept separate from property decision readiness.
-
----
-
-## Privacy & Security
-
-Property documents may contain sensitive personal information.
-
-Property Scan is designed so that:
-
-* documents are anonymized before downstream AI extraction
-* API secrets are stored in **Google Cloud Secret Manager**
-* real API keys are never intentionally committed to GitHub
-* downstream rule evaluation works on anonymized, structured property facts
-* missing information is not silently inferred
-* provider errors are sanitized before being returned to users
-
----
-
-## Tech Stack
-
-| Layer            | Technology                                                          |
-| ---------------- | ------------------------------------------------------------------- |
-| Frontend         | Lovable, React, TypeScript                                          |
-| Backend          | Python, FastAPI, Pydantic                                           |
-| Cloud            | Google Cloud Run, Cloud Build, Secret Manager                       |
-| Document privacy | Anymize                                                             |
-| Analysis         | Structured extraction, canonical normalization, deterministic rules |
-| Deployment       | GitHub → Cloud Build → Cloud Run                                    |
+> **“We do not have enough information” is not the same as “we checked this and everything is fine.”**
 
 ---
 
 ## Current MVP
 
-The current backend includes:
+The live hackathon MVP includes:
 
-* multi-PDF upload
-* PDF validation
-* Anymize OCR/anonymization integration
-* structured property-fact extraction
-* canonical normalization
-* deterministic rule evaluation
-* evidence traceability
-* financial-impact handling
-* buyer actions
-* frontend adapter contract
-* production CORS configuration
-* live Google Cloud deployment
+- multi-PDF upload
+- PDF validation
+- OCR + anonymization
+- structured property-fact extraction
+- evidence / provenance validation
+- canonical fact normalization
+- deterministic cross-document rule evaluation
+- missing-information / needs-verification findings
+- financial-context handling
+- buyer actions
+- evidence drill-down contract
+- partial-document failure isolation
+- production CORS configuration
+- live Google Cloud deployment
+- Lovable frontend integration
 
-At the latest verified backend milestone:
-
-**137 automated tests are passing.**
-
-Current integration work focuses on:
-
-* live model-provider validation
-* final production rule-policy values
-* live Lovable upload → backend analysis connection
-* Golden Case end-to-end validation
+**195/195 automated backend tests passed on the latest verified release candidate.**
 
 ---
 
 ## API
 
-### Health Check
+### Health
 
 ```http
 GET /health
 ```
 
-Confirms that the backend service is running.
-
----
-
-### Demo Assessment
+### Demo assessment
 
 ```http
 GET /demo-assessment
 ```
 
-Returns a synthetic assessment used for frontend integration and testing.
-
----
-
-### Single Document Analysis
+### Single-document analysis
 
 ```http
 POST /analyze
 ```
 
-Processes an individual PDF through the document-processing pipeline.
-
----
-
-### Multi-Document Property Analysis
+### Multi-document property analysis
 
 ```http
 POST /properties/analyze
 ```
 
-This is the main property-analysis endpoint.
+The main endpoint accepts multiple PDFs using `multipart/form-data`. Every uploaded PDF uses the repeated field name `files`.
 
-It accepts multiple PDFs using `multipart/form-data`.
-
-Each document is uploaded using the repeated field name:
-
-```text
-files
-```
-
-Example:
-
-```text
-files = listing.pdf
-files = floor-plan.pdf
-files = management-minutes.pdf
-files = energy-certificate.pdf
-```
-
-The backend analyzes the documents together and returns one structured `PropertyAssessment`.
-
----
-
-## Frontend / Backend Integration
-
-The frontend and backend were developed independently and communicate through an explicit API contract.
-
-The frontend uses an adapter layer:
-
-```text
-Backend PropertyAssessment
-          ↓
-Frontend adapter
-          ↓
-OverallAssessment
-AnalysisCluster[]
-Insight[]
-Action[]
-FinancialOverview
-          ↓
-Existing UI components
-```
-
-This allows the backend due-diligence model and the frontend presentation model to evolve independently.
+The backend returns one structured `PropertyAssessment` for the whole property package.
 
 ---
 
 ## Deployment
 
-The backend is continuously deployed from GitHub.
-
-```text
-VS Code / Codex
-      ↓
-GitHub main
-      ↓
-Google Cloud Build
-      ↓
-Google Cloud Run
-      ↓
-Live FastAPI API
-```
-
-The frontend is hosted through Lovable.
-
-```text
-User
- ↓
-https://propertyscan.lovable.app
- ↓
-Lovable frontend
- ↓
-Google Cloud Run API
- ↓
-PropertyAssessment
- ↓
-Summary / Details / Actions
+```mermaid
+flowchart LR
+    A[GitHub main] --> B[Google Cloud Build]
+    B --> C[Google Cloud Run]
+    C --> D[Live FastAPI API]
+    E[Lovable frontend] -->|HTTPS| D
 ```
 
 ---
 
 ## Brand System
 
-Property Scan is built around three principles:
+**Trust · Evidence · Clarity**
 
-> **Trust / Evidence / Clarity**
-
-### Colors
-
-| Role               | Color     |
-| ------------------ | --------- |
-| Ink — Primary      | `#17242B` |
+| Role | Color |
+| --- | --- |
+| Ink — Primary | `#17242B` |
 | Ivory — Background | `#F5F2EA` |
-| Sage — Success     | `#9BAE9F` |
-| Ochre — Attention  | `#D39A3A` |
-| Brick — Critical   | `#B85C52` |
-| Slate — Neutral    | `#718087` |
+| Sage — Success | `#9BAE9F` |
+| Ochre — Attention | `#D39A3A` |
+| Brick — Critical | `#B85C52` |
+| Slate — Neutral | `#718087` |
 
-### Typography
+**Typography**
 
-* **Playfair Display** — headlines and emphasis
-* **Inter** — body copy and UI text
-
-### Brand Line
-
-> **A clearer view of what matters.**
-
----
-
-## Golden Case
-
-The backend is tested against a defined Golden Case and adversarial scenarios.
-
-The Golden Case helps identify whether an incorrect result was caused by:
-
-* extraction failure
-* normalization failure
-* rule failure
-* missing evidence
-* policy or reasoning gap
-
-This allows the team to test not only whether the final result is correct, but also **where the system failed if it is not**.
+- **Playfair Display** — headlines and emphasis
+- **Inter** — body copy and UI text
 
 ---
 
 ## Team
 
-* **Alina** — Frontend + Team Lead
-* **Julia** — Rulebook + Testing
-* **Virginia** — UX + Customer Journey
-* **Natascha** — Pitch + Storytelling / Brand
-* **Lea** — Backend + AI
+| Team member | Focus |
+| --- | --- |
+| **Alina** | Frontend + Team Lead |
+| **Julia** | Rulebook + Testing |
+| **Virginia** | UX + Customer Journey |
+| **Natascha** | Pitch + Storytelling / Brand |
+| **Lea** | Backend + AI |
 
 ---
 
@@ -610,7 +383,7 @@ Property Scan is not simply:
 
 > Upload PDFs and receive summaries.
 
-The product is designed around:
+It is designed around:
 
 ```text
 Documents
@@ -628,38 +401,22 @@ Buyer actions
 
 The system is deliberately explicit about uncertainty.
 
-If evidence is missing, it says evidence is missing.
-
-If two documents disagree, it shows both values.
-
-If a cost is possible rather than documented, it remains possible.
-
-If payer responsibility is unknown, the system does not silently assign it to the buyer.
+If evidence is missing, it says evidence is missing. If two documents disagree, it keeps both values visible. If a cost is possible rather than confirmed, it remains possible. If payer responsibility is unknown, the system does not silently assign it to the buyer.
 
 ---
 
 ## Disclaimer
 
-Property Scan is a hackathon prototype and decision-support tool.
+Property Scan is a hackathon prototype and decision-support tool. It does not provide legal, financial, tax, surveying or other professional real-estate advice.
 
-It does not provide legal, financial, tax, surveying or other professional real-estate advice.
-
-Findings depend on:
-
-* the documents supplied
-* available evidence
-* extraction quality
-* normalization logic
-* implemented rule definitions
-
-Important conclusions should be independently verified before making a property-purchase decision.
+Findings depend on the documents supplied, extraction quality, available evidence, normalization logic and implemented rule definitions. Important conclusions should be independently verified before making a property-purchase decision.
 
 ---
 
-## AI.WOMEN Hackathon 2026
+<div align="center">
 
-Built with a focus on:
+### AI.WOMEN Hackathon 2026
 
-**Trust / Evidence / Clarity**
+**Property Scan — A clearer view of what matters.**
 
-> **Property Scan — A clearer view of what matters.**
+</div>
