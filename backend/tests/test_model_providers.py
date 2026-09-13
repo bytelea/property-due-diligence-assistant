@@ -220,3 +220,82 @@ class ProviderRouteTests(unittest.TestCase):
                     else:
                         vertex.assert_not_called()
                     self.assertEqual(captured, [TEXT, TEXT])
+
+
+class ModelDiagnosticTests(unittest.IsolatedAsyncioTestCase):
+    async def test_failure_categories_and_no_sensitive_metadata(self):
+        cases = [(401, {}, 'auth_error', 503), (403, {}, 'auth_error', 503),
+                 (404, {}, 'model_not_found', 503), (429, {}, 'rate_limited', 503),
+                 (500, {}, 'provider_5xx', 503),
+                 (200, envelope('{}', model='other'), 'response_model_mismatch', 503),
+                 (200, envelope('not-json'), 'invalid_json', 502),
+                 (200, envelope('{"facts":"wrong"}'), 'schema_validation_failed', 502),
+                 (200, envelope(''), 'missing_content', 502)]
+        for status, payload, category, public_status in cases:
+            with self.subTest(category=category):
+                payload['private_metadata'] = TEST_SECRET + TEXT
+                adapter = AnymizeStructuredModel(httpx.MockTransport(lambda request: httpx.Response(status, json=payload)))
+                with patch('app.services.anymize_model.get_settings', return_value=settings()):
+                    with self.assertLogs('app.services.anymize_model', level='INFO') as logs:
+                        with self.assertRaises(ExtractionError) as caught:
+                            await adapter.generate('PRIVATE PROMPT', TEXT, FactCandidates)
+                self.assertEqual(caught.exception.status_code, public_status)
+                output = str(logs.output) + str(caught.exception)
+                self.assertIn(category, output)
+                for secret in (TEST_SECRET, TEXT, 'PRIVATE PROMPT', 'private_metadata'):
+                    self.assertNotIn(secret, output)
+                self.assertTrue(all(r.exc_info is None for r in logs.records))
+                self.assertIn('elapsed_ms', output)
+
+    async def test_success_diagnostics_safe_tokens_and_validation(self):
+        payload = envelope(json.dumps(FACTS))
+        payload['usage'] = {'prompt_tokens': 12, 'completion_tokens': 8, 'total_tokens': 20, 'private': TEXT}
+        adapter = AnymizeStructuredModel(httpx.MockTransport(lambda request: httpx.Response(200, json=payload)))
+        with patch('app.services.anymize_model.get_settings', return_value=settings()):
+            with self.assertLogs('app.services.anymize_model', level='INFO') as logs:
+                result = await adapter.generate('PRIVATE PROMPT', TEXT, FactCandidates)
+        self.assertEqual(json.loads(result), FACTS)
+        output = str(logs.output)
+        for fragment in ("'schema_validated': True", "'structured_json_parsed': True", "'finish_reason': 'stop'", "'total_tokens': 20"):
+            self.assertIn(fragment, output)
+        for value in (TEXT, TEST_SECRET, 'PRIVATE PROMPT'):
+            self.assertNotIn(value, output)
+
+    async def test_unsafe_finish_reason_and_tokens_are_omitted(self):
+        payload = envelope('{}', choices=[{'finish_reason': TEST_SECRET + TEXT, 'message': {'role': 'assistant', 'content': TEXT}}])
+        payload['usage'] = {'prompt_tokens': TEXT, 'completion_tokens': True, 'total_tokens': -1}
+        adapter = AnymizeStructuredModel(httpx.MockTransport(lambda request: httpx.Response(200, json=payload)))
+        with patch('app.services.anymize_model.get_settings', return_value=settings()):
+            with self.assertLogs('app.services.anymize_model', level='INFO') as logs:
+                with self.assertRaises(ExtractionError):
+                    await adapter.generate('instruction', TEXT, FactCandidates)
+        output = str(logs.output)
+        self.assertIn('unrecognized', output)
+        for value in (TEST_SECRET, TEXT, 'prompt_tokens', 'completion_tokens', 'total_tokens'):
+            self.assertNotIn(value, output)
+
+    async def test_timeout_and_unexpected_errors_have_safe_diagnostics(self):
+        for error, category, status in ((httpx.ReadTimeout(TEST_SECRET + TEXT), 'timeout', 504),
+                                        (RuntimeError(TEST_SECRET + TEXT), 'unexpected_error', 502)):
+            def handle(request):
+                raise error
+            with patch('app.services.anymize_model.get_settings', return_value=settings()):
+                with self.assertLogs('app.services.anymize_model', level='INFO') as logs:
+                    with self.assertRaises(ExtractionError) as caught:
+                        await AnymizeStructuredModel(httpx.MockTransport(handle)).generate('instruction', TEXT, FactCandidates)
+            self.assertEqual(caught.exception.status_code, status)
+            self.assertIn(category, str(logs.output))
+            self.assertNotIn(TEST_SECRET, str(logs.output))
+            self.assertNotIn(TEXT, str(logs.output))
+
+    async def test_non_json_response_is_diagnosed_without_body(self):
+        adapter = AnymizeStructuredModel(httpx.MockTransport(lambda request: httpx.Response(200, text=TEST_SECRET + TEXT)))
+        with patch('app.services.anymize_model.get_settings', return_value=settings()):
+            with self.assertLogs('app.services.anymize_model', level='INFO') as logs:
+                with self.assertRaises(ExtractionError) as caught:
+                    await adapter.generate('instruction', TEXT, FactCandidates)
+        self.assertEqual(caught.exception.status_code, 502)
+        self.assertIn("'response_json_exists': False", str(logs.output))
+        self.assertIn('invalid_json', str(logs.output))
+        self.assertNotIn(TEST_SECRET, str(logs.output))
+        self.assertNotIn(TEXT, str(logs.output))
