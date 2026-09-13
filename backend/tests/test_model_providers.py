@@ -299,3 +299,70 @@ class ModelDiagnosticTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('invalid_json', str(logs.output))
         self.assertNotIn(TEST_SECRET, str(logs.output))
         self.assertNotIn(TEXT, str(logs.output))
+
+
+class ResilientRoutingTests(unittest.IsolatedAsyncioTestCase):
+    async def route(self, outcomes, model=MODEL, error=None):
+        sent = []
+        def handle(request):
+            body = json.loads(request.content)
+            sent.append(body['model'])
+            self.assertEqual(body['messages'][1]['content'], TEXT)
+            self.assertEqual(body['response_format']['json_schema']['schema'], FactCandidates.model_json_schema())
+            outcome = outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+        adapter = AnymizeStructuredModel(httpx.MockTransport(handle))
+        adapter.BACKOFF_BASE = 0
+        with patch('app.services.anymize_model.get_settings', return_value=settings(anymize_model=model)):
+            with self.assertLogs('app.services.anymize_model', level='INFO') as logs:
+                if error:
+                    with self.assertRaises(ExtractionError) as caught:
+                        await adapter.generate('instruction', TEXT, FactCandidates)
+                    self.assertEqual(caught.exception.status_code, error)
+                else:
+                    self.assertEqual(json.loads(await adapter.generate('instruction', TEXT, FactCandidates)), FACTS)
+        for value in (TEST_SECRET, TEXT):
+            self.assertNotIn(value, str(logs.output))
+        self.assertLessEqual(len(sent), 3)
+        return sent
+
+    def success(self, model=MODEL):
+        return httpx.Response(200, json=envelope(json.dumps(FACTS), model=model))
+
+    async def test_fixed_success(self):
+        self.assertEqual(await self.route([self.success()]), [MODEL])
+
+    async def test_auto_concrete_models(self):
+        for model in ('google/gemini-3.5-flash', 'google/gemini-2.5-pro', 'openai/gpt-5.6-luna'):
+            self.assertEqual(await self.route([self.success(model)], model='auto'), ['auto'])
+
+    async def test_transient_retry_success(self):
+        for outcome in (httpx.Response(429), httpx.Response(503), httpx.ReadTimeout(TEST_SECRET), httpx.ConnectError(TEST_SECRET)):
+            self.assertEqual(await self.route([outcome, self.success()]), [MODEL, MODEL])
+
+    async def test_final_auto_fallback_success(self):
+        self.assertEqual(await self.route([httpx.Response(500), httpx.Response(429), self.success('google/gemini-2.5-pro')]), [MODEL, MODEL, 'auto'])
+
+    async def test_auto_three_attempt_limit(self):
+        self.assertEqual(await self.route([httpx.Response(503) for _ in range(3)], model='auto', error=503), ['auto'] * 3)
+
+    async def test_non_retryable_http_statuses(self):
+        for status in (401, 403, 404, 400, 422):
+            self.assertEqual(await self.route([httpx.Response(status)], error=503 if status in (401,403,404) else 502), [MODEL])
+
+    async def test_invalid_auto_response_model(self):
+        for model in ('auto', '../bad', 'google/model?x', 'bad model', TEST_SECRET, 'x' * 130):
+            self.assertEqual(await self.route([self.success(model)], model='auto', error=502), ['auto'])
+
+    async def test_schema_failure_not_retried(self):
+        self.assertEqual(await self.route([httpx.Response(200, json=envelope('{"facts":"bad"}'))], error=502), [MODEL])
+
+    async def test_overall_deadline_includes_backoff(self):
+        adapter = AnymizeStructuredModel(httpx.MockTransport(lambda request: httpx.Response(503)))
+        adapter.PROCESSING_TIMEOUT = 0.01
+        with patch('app.services.anymize_model.get_settings', return_value=settings()):
+            with self.assertRaises(ExtractionError) as error:
+                await adapter.generate('instruction', TEXT, FactCandidates)
+        self.assertEqual(error.exception.status_code, 504)

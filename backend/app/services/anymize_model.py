@@ -28,6 +28,10 @@ PLACEHOLDER_INSTRUCTION = (
 
 
 class AnymizeStructuredModel:
+    PROCESSING_TIMEOUT = 60
+    BACKOFF_BASE = 0.5
+    MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}(?:/[A-Za-z0-9][A-Za-z0-9_.-]{0,63})?")
+
     BASE_URL = "https://app.anymize.ai/api/v1/llm/"
 
     def __init__(self, transport: httpx.AsyncBaseTransport | None = None):
@@ -62,24 +66,42 @@ class AnymizeStructuredModel:
         emit()
         diagnostic["category"] = "unexpected_error"
         try:
-            async with asyncio.timeout(60):
+            async with asyncio.timeout(self.PROCESSING_TIMEOUT):
                 async with httpx.AsyncClient(
                     base_url=self.BASE_URL, headers={"Authorization": f"Bearer {api_key}"},
-                    timeout=httpx.Timeout(55), follow_redirects=False, transport=self._transport,
+                    timeout=httpx.Timeout(18), follow_redirects=False, transport=self._transport,
                 ) as client:
-                    response = await client.post("chat/completions", json={
-                        "model": model,
-                        "messages": [
-                            {"role": "system", "content": instruction + "\n\n" + PLACEHOLDER_INSTRUCTION},
-                            {"role": "user", "content": content},
-                        ],
-                        "temperature": 0,
-                        "stream": False,
-                        "response_format": {
-                            "type": "json_schema",
-                            "json_schema": {"name": schema.__name__, "schema": schema.model_json_schema()},
-                        },
-                    })
+                    for attempt in range(3):
+                        requested_model = "auto" if attempt == 2 else model
+                        diagnostic.update(stage="model_request", attempt=attempt + 1, http_status=None)
+                        try:
+                            response = await client.post("chat/completions", json={
+                                "model": requested_model,
+                                "messages": [
+                                    {"role": "system", "content": instruction + "\n\n" + PLACEHOLDER_INSTRUCTION},
+                                    {"role": "user", "content": content},
+                                ],
+                                "temperature": 0,
+                                "stream": False,
+                                "response_format": {
+                                    "type": "json_schema",
+                                    "json_schema": {"name": schema.__name__, "schema": schema.model_json_schema()},
+                                },
+                            })
+                        except (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError):
+                            diagnostic["category"] = "transient_transport_error"
+                            emit()
+                            if attempt == 2:
+                                raise
+                        else:
+                            if response.status_code != 429 and not 500 <= response.status_code <= 599:
+                                break
+                            diagnostic.update(http_status=response.status_code, category=(
+                                "rate_limited" if response.status_code == 429 else "provider_5xx"))
+                            emit()
+                            if attempt == 2:
+                                break
+                        await asyncio.sleep(self.BACKOFF_BASE * (2 ** attempt))
             diagnostic.update(stage="model_response", http_status=response.status_code)
             # Observe JSON metadata without changing HTTP rejection behavior.
             try:
@@ -122,12 +144,20 @@ class AnymizeStructuredModel:
             diagnostic["category"] = "invalid_envelope"
             if not isinstance(payload, dict):
                 raise ValueError("Invalid response envelope")
-            # Do not silently accept a provider-side fallback to a different model.
+            # Fixed routing stays exact; auto may return a safe concrete model ID.
             if not isinstance(payload.get("model"), str):
                 raise ValueError("Missing response model")
-            if payload["model"] != model:
+            actual_model = payload["model"]
+            if not self.MODEL_ID.fullmatch(actual_model) or api_key.lower() in actual_model.lower():
+                diagnostic["category"] = "invalid_response_model"
+                raise ValueError("Invalid response model")
+            if requested_model == "auto" and actual_model == "auto":
+                diagnostic["category"] = "invalid_response_model"
+                raise ValueError("Auto did not identify a concrete model")
+            if requested_model != "auto" and actual_model != requested_model:
                 diagnostic["category"] = "response_model_mismatch"
                 raise ExtractionError(503, "Property extraction provider returned an unexpected model.")
+            diagnostic["actual_model"] = actual_model
             diagnostic["category"] = "missing_content"
             choices = payload.get("choices")
             if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):

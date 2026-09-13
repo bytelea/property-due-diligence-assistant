@@ -1,90 +1,49 @@
 # Structured extraction providers
 
-Provider selection is explicit through `MODEL_PROVIDER=vertex|anymize`; the default
-is `vertex`, preserving existing deployments. Errors never trigger an automatic
-provider switch. Both adapters implement the existing `StructuredModelClient`
-protocol (`generate(instruction, content, schema) -> JSON string`). The only
-extraction wiring change selects that interface through `get_structured_model()`.
-Classification, extraction schemas, evidence validation, normalization, rules,
-endpoint paths, response models and frontend contracts are unchanged.
+`MODEL_PROVIDER=vertex|anymize` selects the provider. The default remains Vertex.
+Both adapters use the existing structured extraction schemas. Only anonymized OCR
+text reaches classification and extraction. Evidence validation, normalization,
+rules and API response contracts are unchanged.
 
-## Verified official API contract
+## Anymize configuration
 
-Checked 2026-09-12:
+Set `MODEL_PROVIDER=anymize` and `ANYMIZE_MODEL` to an account-supported fixed model
+ID or `auto`. Keep `ANYMIZE_API_KEY` injected from Secret Manager; the adapter
+accesses it through Settings. No local environment file is required in production.
 
-- [API getting started](https://anymize.ai/api-docs): LLM base URL
-  `https://app.anymize.ai/api/v1/llm` and Bearer authentication.
-- [Chat API](https://anymize.ai/api-docs/chat):
-  `POST /api/v1/llm/chat/completions`, standard messages, JSON output,
-  `response_format.type=json_schema` with `json_schema.name` and `json_schema.schema`.
-  Its Models section lists `gemini-2.5-flash` as a Google model ID.
-- The same Chat API documentation explicitly supports pre-anonymized text on the
-  standard endpoint with instructions to preserve double-bracket placeholders.
+Requests use `https://app.anymize.ai/api/v1/llm/chat/completions` with structured
+JSON schemas. The adapter does not use the deanonymizing anonymous-chat endpoint.
+Account model availability should be confirmed through the provider model list.
 
-The request uses the standard endpoint and Gemini model ID above, with the existing
-Pydantic JSON schema, temperature 0 and streaming disabled. This is a configured
-model, not an automatically chosen fallback. The adapter requires the response's
-model to match the configured model; provider-side substitutions fail safely.
+## Bounded resilience
 
-The general marketing page shows alternative URLs/prefixed model names. This
-implementation follows the dedicated API documentation's endpoint and model-ID
-example. Account-specific model availability and Gemini's acceptance of every
-schema keyword remain deployment smoke-test items. No authenticated live calls
-were made during implementation; the API/model contracts are documentation-verified,
-not a claim of successful inference with this account.
+Each generation has at most three HTTP attempts inside the existing 60-second
+overall deadline, including backoff. HTTP operations have an 18-second timeout.
+Backoff is 0.5 seconds then 1 second.
 
-## Configuration
+Only HTTP 429, HTTP 500–599, transport timeouts, network errors and remote protocol
+errors are retryable. For a fixed model, attempts one and two use that model;
+following two transient failures, the final attempt uses `auto`. When configured
+with `auto`, all three attempts use `auto`. A deadline may end processing sooner.
 
-To use Anymize without Vertex IAM:
+Authentication failures, 404, other rejected requests, malformed output, schema
+errors and evidence failures do not trigger retries or fallback. There is no
+cross-provider fallback to Vertex.
 
-```dotenv
-MODEL_PROVIDER=anymize
-ANYMIZE_MODEL=gemini-2.5-flash
-```
+Fixed-model response IDs must match exactly. Auto responses must identify a
+concrete model using a strict bounded identifier pattern; an `auto` response ID,
+unsafe characters or a reflected key are rejected. The actual model is recorded
+in safe diagnostics for each successful response. No mutable shared adapter
+state or assessment-contract fields are added for this metadata.
 
-Keep the existing `ANYMIZE_API_KEY` Secret Manager injection. It is accessed only
-through `get_settings().anymize_api_key.get_secret_value()`. Do not put its value
-in source, documentation, example files or logs. The setting ANYMIZE_MODEL has no
-implicit default; an empty model/key returns sanitized 503. Restart/redeploy after
-changing environment configuration, as settings are cached.
+## Safety and diagnostics
 
-To keep Vertex:
+Logs contain only validated control metadata, fixed categories, timing, token
+counts and validation flags. Never log keys, prompts, document text, response
+bodies or exception details. Redirects are not followed. Existing schema,
+placeholder and exact-evidence checks remain enforced after routing.
 
-```dotenv
-MODEL_PROVIDER=vertex
-```
-
-The existing GEMINI_MODEL, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION and Cloud Run
-service identity/IAM configuration still apply. The Vertex implementation and its
-sanitized authentication handling are retained. Anymize selection does not create
-a Vertex client or require its IAM permissions.
-
-## Privacy and error behavior
-
-Only the OCR adapter receives PDFs. Its anonymized output feeds classification and
-extraction. No original_text, job IDs or deanonymization mappings are included in
-model requests. The model adapter never calls the anonymous chat endpoint or a
-deanonymization endpoint. It adds placeholder-preservation instructions, rejects
-new/altered double-bracket tokens and validates JSON against the existing schema.
-Existing extraction checks still require verbatim evidence from anonymized input.
-
-The adapter returns only assistant content, never raw provider metadata. Empty,
-malformed, refused, truncated or schema-invalid output is rejected. A reflected key
-is rejected even after JSON escape decoding. HTTP redirects are not followed;
-Authorization cannot be forwarded to an alternate host through a redirect.
-Application errors/logs contain no request bodies, Authorization headers, response
-bodies or exception details. Access failures emit only a fixed short warning.
-
-- 503: missing configuration, authentication/access failure, rate limit,
-  unavailable model/service, or unexpected model substitution.
-- 504: request/overall timeout.
-- 502: other request failure or invalid structured response.
-
-The 60-second overall deadline and 55-second HTTP timeout bound each model call.
-There are no retries or alternate-provider attempts. Check account-side logging,
-retention and fallback settings in the Anymize console separately; application
-logging policy does not configure provider-side retention.
-
-The fallback removes the Vertex dependency for model calls. Existing missing
-canonical metadata/policy can still yield MISSING_INPUTS and NOT_DECISION_READY;
-this milestone does not change extraction or rule completeness.
+Exhausted HTTP availability failures remain sanitized 503 responses; timeouts
+remain 504; invalid structured output remains 502. Routing does not change
+readiness or deterministic property rules. Mocked tests do not prove live
+account availability.
