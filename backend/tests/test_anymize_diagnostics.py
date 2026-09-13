@@ -52,7 +52,7 @@ class OcrDiagnosticTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_unknown_status_and_untrusted_keys_are_never_logged(self):
         output = await self.invoke([httpx.Response(202, json={'job_id': 'safe-job-id'}), httpx.Response(200, json={
-            'status': 'SENSITIVE_SENTINEL', 'SENSITIVE_SENTINEL': 'SENSITIVE_SENTINEL'
+            'status': 'SENSITIVE_SENTINEL/', 'SENSITIVE_SENTINEL': 'SENSITIVE_SENTINEL'
         })], 502)
         self.assertIn('unrecognized', output)
         self.assertIn('unexpected_job_status', output)
@@ -203,3 +203,41 @@ class PendingOcrTests(unittest.IsolatedAsyncioTestCase):
         polls, output = await self.run_sequence(['pending', 'completed'], expected_error=502)
         self.assertEqual(polls, ['pending', 'completed'])
         self.assertIn('unusable_result', output)
+
+
+class ValidatedStatusDiagnosticTests(unittest.IsolatedAsyncioTestCase):
+    async def check_status(self, raw, expected):
+        calls = []
+        def handle(request):
+            calls.append(request.method)
+            if request.method == 'POST':
+                return httpx.Response(202, json={'job_id': 'synthetic-job-id'})
+            return httpx.Response(200, json={'status': raw, 'original_text': 'PRIVATE BODY',
+                                            'anonymized_text_raw': 'PRIVATE ANONYMIZED BODY'})
+        with patch('app.services.anymize.get_settings', return_value=Settings(_env_file=None, anymize_api_key='synthetic-secret-key')):
+            with self.assertLogs('app.services.anymize', level='WARNING') as logs:
+                with self.assertRaises(AnymizeError) as error:
+                    await AnymizeService(httpx.MockTransport(handle)).anonymize_pdf(b'%PDF-PRIVATE BODY')
+        self.assertEqual(error.exception.status_code, 502)
+        self.assertEqual(calls, ['POST', 'GET'])
+        self.assertIn("'job_status': " + repr(expected), logs.output[0])
+        for value in ('synthetic-secret-key', 'synthetic-job-id', 'PRIVATE BODY', 'PRIVATE ANONYMIZED BODY'):
+            self.assertNotIn(value, str(logs.output) + str(error.exception))
+        self.assertTrue(all(r.exc_info is None for r in logs.records))
+
+    async def test_safe_metadata_is_normalized_for_logging(self):
+        for raw, expected in (('  NEW_STATE-2  ', 'new_state-2'), ('a' * 32, 'a' * 32), ('RUNNING', 'running')):
+            await self.check_status(raw, expected)
+
+    async def test_invalid_metadata_is_hidden(self):
+        for raw in (None, 123, [], {}, '', ' ', 'a' * 33, 'bad/status', 'bad?status',
+                    'bad#status', 'bad%status', 'bad status', 'bad\x00status', 'bad\nstatus', 'ÜBER'):
+            await self.check_status(raw, 'unrecognized')
+
+    async def test_reflected_credentials_and_job_ids_are_hidden(self):
+        for raw in ('synthetic-secret-key', 'SYNTHETIC-JOB-ID'):
+            await self.check_status(raw, 'unrecognized')
+
+    async def test_normalized_logging_does_not_change_polling_semantics(self):
+        for raw in (' Pending ', 'PROCESSING', ' Completed '):
+            await self.check_status(raw, raw.strip().lower())

@@ -77,9 +77,12 @@ class AnymizeService:
                         diagnostic = {"stage": "ocr_poll", "http_status": None, "category": "transport_error"}
                         payload = self._payload(await client.get(f"status/{job_id}"), diagnostic)
                         status = payload.get("status")
-                        # Never log an arbitrary provider status: it could contain content.
-                        diagnostic["job_status"] = status if isinstance(status, str) and status in (
-                            "processing", "completed", "failed", "queued", "pending", "cancelled"
+                        # Normalize only diagnostic metadata; polling still compares raw status.
+                        normalized_status = status.strip().lower() if isinstance(status, str) else ""
+                        diagnostic["job_status"] = normalized_status if (
+                            re.fullmatch(r"[a-z0-9_-]{1,32}", normalized_status)
+                            and api_key.lower() not in normalized_status
+                            and job_id.lower() not in normalized_status
                         ) else "unrecognized"
                         if status == "completed":
                             diagnostic["stage"] = "ocr_result"
