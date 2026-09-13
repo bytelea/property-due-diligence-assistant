@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/brand/property-scan-logo.png" alt="Property Scan logo" width="96" />
+<img src="docs/brand/property-scan-logo.png" alt="Property Scan logo" width="250" />
 
 ### A clearer view of what matters.
 
