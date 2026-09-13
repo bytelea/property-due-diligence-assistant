@@ -6,7 +6,7 @@
 
 **More than documents. Real answers.**
 
-AI-supported property due diligence for residential buyers — built during the **AI.WOMEN Hackathon 2026**.
+AI-supported property due diligence for residential buyers - built during the **AI.WOMEN Hackathon 2026**.
 
 **Trust · Evidence · Clarity**
 
@@ -18,7 +18,7 @@ AI-supported property due diligence for residential buyers — built during the 
 
 ## Why Property Scan?
 
-Buying a home should feel exciting. Instead, buyers often receive a pile of documents written for professionals — and are expected to know what matters.
+Buying a home should feel exciting. Instead, buyers often receive a pile of documents written for professionals - and are expected to know what matters.
 
 A floor plan. A land-register extract. Homeowners' association minutes. Financial statements. Energy documents. Planned maintenance.
 
@@ -105,11 +105,11 @@ AI is used for the parts that require understanding unstructured documents:
 - document classification
 - German-language property-document understanding
 - structured fact extraction
-- source-evidence extraction from anonymized text
+- source-evidence extraction from anonymised text
 
 AI does **not** make the final due-diligence decision on its own.
 
-After extraction, Property Scan validates evidence, normalizes facts into a canonical model and applies deterministic rules across documents. This separation makes the system easier to test, explain and improve.
+After extraction, Property Scan validates evidence, normalises facts into a canonical model and applies deterministic rules across documents. This separation makes the system easier to test, explain and improve.
 
 ---
 
@@ -215,11 +215,11 @@ Property documents can contain sensitive personal information, so privacy is par
 
 The MVP is designed so that:
 
-- documents are anonymized before downstream AI extraction
+- documents are anonymised before downstream AI extraction
 - API secrets are stored in Google Cloud Secret Manager
 - real API keys are not committed to GitHub
-- downstream rule evaluation works on anonymized structured facts
-- provider errors are sanitized before being returned to users
+- downstream rule evaluation works on anonymised structured facts
+- provider errors are sanitised before being returned to users
 - missing information is not silently inferred
 - uploaded documents are **not persisted in a separate document database** in the hackathon MVP
 
@@ -409,7 +409,7 @@ If evidence is missing, it says evidence is missing. If two documents disagree, 
 
 Property Scan is a hackathon prototype and decision-support tool. It does not provide legal, financial, tax, surveying or other professional real-estate advice.
 
-Findings depend on the documents supplied, extraction quality, available evidence, normalization logic and implemented rule definitions. Important conclusions should be independently verified before making a property-purchase decision.
+Findings depend on the documents supplied, extraction quality, available evidence, normalisation logic and implemented rule definitions. Important conclusions should be independently verified before making a property-purchase decision.
 
 ---
 
