@@ -10,7 +10,7 @@ AI-supported property due diligence for residential buyers - built during the **
 
 **Trust · Evidence · Clarity**
 
-[Live App](https://propertyscan.lovable.app/) · [NOTION]([https://property-due-diligence-api-267668658542.europe-west1.run.app](https://campusleaders.notion.site/propertyscan)) · [API Docs](https://property-due-diligence-api-267668658542.europe-west1.run.app/docs)
+[Live App](https://propertyscan.lovable.app/) · [Notion](https://campusleaders.notion.site/propertyscan) · [API Docs](https://property-due-diligence-api-267668658542.europe-west1.run.app/docs)
 
 </div>
 
